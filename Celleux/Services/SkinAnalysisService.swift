@@ -1,6 +1,7 @@
 import UIKit
 import CoreImage
 import Vision
+import Accelerate
 
 nonisolated class SkinAnalysisService: Sendable {
 
@@ -24,6 +25,8 @@ nonisolated class SkinAnalysisService: Sendable {
         var allTexture: [Double] = []
         var allSaturationVar: [Double] = []
         var allBStar: [Double] = []
+        var allMeanL: [Double] = []
+        var allHFEnergy: [Double] = []
 
         for (name, rect) in namedRegions {
             guard let cropped = cgImage.cropping(to: rect),
@@ -33,12 +36,14 @@ nonisolated class SkinAnalysisService: Sendable {
             let hScore = mapHydrationToScore(metrics.saturationVariance)
             let bScore = mapITAToScore(metrics.ita)
             let rScore = mapRednessToScore(metrics.redness)
+            let pScore = mapPoreVisibilityToScore(metrics.highFreqLaplacianEnergy)
 
             regionData[name] = RegionScores(
                 textureEvennessScore: tScore,
                 apparentHydrationScore: hScore,
                 brightnessRadianceScore: bScore,
                 rednessScore: rScore,
+                poreVisibilityScore: pScore,
                 itaAngle: metrics.ita,
                 aStarMean: metrics.redness,
                 bStarMean: metrics.bStar,
@@ -51,28 +56,44 @@ nonisolated class SkinAnalysisService: Sendable {
             allTexture.append(metrics.texture)
             allSaturationVar.append(metrics.saturationVariance)
             allBStar.append(metrics.bStar)
+            allMeanL.append(metrics.meanL)
+            allHFEnergy.append(metrics.highFreqLaplacianEnergy)
         }
 
         guard !allITA.isEmpty else {
             return nil
         }
 
-        let avgITA = allITA.reduce(0, +) / Double(allITA.count)
-        let avgRedness = allRedness.reduce(0, +) / Double(allRedness.count)
-        let avgTexture = allTexture.reduce(0, +) / Double(allTexture.count)
-        let avgSatVar = allSaturationVar.reduce(0, +) / Double(allSaturationVar.count)
-        let avgBStar = allBStar.reduce(0, +) / Double(allBStar.count)
+        let count = Double(allITA.count)
+        let avgITA = allITA.reduce(0, +) / count
+        let avgRedness = allRedness.reduce(0, +) / count
+        let avgTexture = allTexture.reduce(0, +) / count
+        let avgSatVar = allSaturationVar.reduce(0, +) / count
+        let avgBStar = allBStar.reduce(0, +) / count
+        let avgHFEnergy = allHFEnergy.reduce(0, +) / count
+
+        let lStarMean = allMeanL.reduce(0, +) / count
+        let lStarStdDev = sqrt(allMeanL.reduce(0) { $0 + ($1 - lStarMean) * ($1 - lStarMean) } / count)
+        let toneUniformityScore = mapToneUniformityToScore(lStarStdDev)
+
+        for (name, var scores) in regionData {
+            scores.toneUniformityScore = toneUniformityScore
+            regionData[name] = scores
+        }
 
         let textureEvennessScore = mapTextureToScore(avgTexture)
         let apparentHydrationScore = mapHydrationToScore(avgSatVar)
         let brightnessRadianceScore = mapITAToScore(avgITA)
         let rednessScore = mapRednessToScore(avgRedness)
+        let poreVisibilityScore = mapPoreVisibilityToScore(avgHFEnergy)
 
         var data = SkinAnalysisData(
             textureEvennessScore: textureEvennessScore,
             apparentHydrationScore: apparentHydrationScore,
             brightnessRadianceScore: brightnessRadianceScore,
             rednessScore: rednessScore,
+            poreVisibilityScore: poreVisibilityScore,
+            toneUniformityScore: toneUniformityScore,
             itaAngle: avgITA,
             aStarMean: avgRedness,
             bStarMean: avgBStar,
@@ -104,12 +125,16 @@ nonisolated class SkinAnalysisService: Sendable {
         let apparentHydrationScore = mapHydrationToScore(metrics.saturationVariance)
         let brightnessRadianceScore = mapITAToScore(metrics.ita)
         let rednessScore = mapRednessToScore(metrics.redness)
+        let poreVisibilityScore = mapPoreVisibilityToScore(metrics.highFreqLaplacianEnergy)
+        let toneUniformityScore = mapToneUniformityToScore(0)
 
         let scores = RegionScores(
             textureEvennessScore: textureEvennessScore,
             apparentHydrationScore: apparentHydrationScore,
             brightnessRadianceScore: brightnessRadianceScore,
             rednessScore: rednessScore,
+            poreVisibilityScore: poreVisibilityScore,
+            toneUniformityScore: toneUniformityScore,
             itaAngle: metrics.ita,
             aStarMean: metrics.redness,
             bStarMean: metrics.bStar,
@@ -131,6 +156,8 @@ nonisolated class SkinAnalysisService: Sendable {
             apparentHydrationScore: apparentHydrationScore,
             brightnessRadianceScore: brightnessRadianceScore,
             rednessScore: rednessScore,
+            poreVisibilityScore: poreVisibilityScore,
+            toneUniformityScore: toneUniformityScore,
             itaAngle: metrics.ita,
             aStarMean: metrics.redness,
             bStarMean: metrics.bStar,
@@ -242,6 +269,8 @@ nonisolated class SkinAnalysisService: Sendable {
         let bStar: Double
         let texture: Double
         let saturationVariance: Double
+        let meanL: Double
+        let highFreqLaplacianEnergy: Double
     }
 
     private func computeRegionMetrics(cgImage: CGImage, context: CIContext) -> InternalRegionMetrics? {
@@ -302,14 +331,18 @@ nonisolated class SkinAnalysisService: Sendable {
         let meanSat = satValues.reduce(0, +) / Double(satValues.count)
         let satVar = satValues.reduce(0) { $0 + ($1 - meanSat) * ($1 - meanSat) } / Double(satValues.count)
 
-        let textureVar = computeTextureVariance(ptr: ptr, width: width, height: height, bytesPerRow: bytesPerRow, bytesPerPixel: bytesPerPixel, dataLength: CFDataGetLength(data))
+        let dataLength = CFDataGetLength(data)
+        let textureVar = computeTextureVariance(ptr: ptr, width: width, height: height, bytesPerRow: bytesPerRow, bytesPerPixel: bytesPerPixel, dataLength: dataLength)
+        let hfEnergy = computeHighFreqLaplacianEnergy(ptr: ptr, width: width, height: height, bytesPerRow: bytesPerRow, bytesPerPixel: bytesPerPixel, dataLength: dataLength)
 
         return InternalRegionMetrics(
             ita: ita,
             redness: meanA,
             bStar: meanB,
             texture: textureVar,
-            saturationVariance: satVar
+            saturationVariance: satVar,
+            meanL: meanL,
+            highFreqLaplacianEnergy: hfEnergy
         )
     }
 
@@ -400,5 +433,50 @@ nonisolated class SkinAnalysisService: Sendable {
         if satVariance < 0.015 { return 70 + (0.015 - satVariance) * (20.0 / 0.01) }
         if satVariance < 0.04 { return 50 + (0.04 - satVariance) * (20.0 / 0.025) }
         return max(25, 50 - (satVariance - 0.04) * 500)
+    }
+
+    private func mapPoreVisibilityToScore(_ hfEnergy: Double) -> Double {
+        if hfEnergy < 50 { return min(98, 92 + (50 - hfEnergy) * 0.12) }
+        if hfEnergy < 150 { return 75 + (150 - hfEnergy) * (17.0 / 100.0) }
+        if hfEnergy < 400 { return 50 + (400 - hfEnergy) * (25.0 / 250.0) }
+        return max(25, 50 - (hfEnergy - 400) * 0.05)
+    }
+
+    private func mapToneUniformityToScore(_ lStarStdDev: Double) -> Double {
+        if lStarStdDev < 2 { return min(98, 92 + (2 - lStarStdDev) * 3) }
+        if lStarStdDev < 5 { return 75 + (5 - lStarStdDev) * (17.0 / 3.0) }
+        if lStarStdDev < 10 { return 55 + (10 - lStarStdDev) * (20.0 / 5.0) }
+        return max(25, 55 - (lStarStdDev - 10) * 2)
+    }
+
+    private func computeHighFreqLaplacianEnergy(ptr: UnsafePointer<UInt8>, width: Int, height: Int, bytesPerRow: Int, bytesPerPixel: Int, dataLength: Int) -> Double {
+        var highFreqValues: [Double] = []
+        let step = max(1, min(width, height) / 80)
+
+        for y in stride(from: 2, to: height - 2, by: step) {
+            for x in stride(from: 2, to: width - 2, by: step) {
+                let center = grayAt(ptr, x: x, y: y, bytesPerRow: bytesPerRow, bpp: bytesPerPixel, dataLength: dataLength)
+                let top = grayAt(ptr, x: x, y: y - 1, bytesPerRow: bytesPerRow, bpp: bytesPerPixel, dataLength: dataLength)
+                let bottom = grayAt(ptr, x: x, y: y + 1, bytesPerRow: bytesPerRow, bpp: bytesPerPixel, dataLength: dataLength)
+                let left = grayAt(ptr, x: x - 1, y: y, bytesPerRow: bytesPerRow, bpp: bytesPerPixel, dataLength: dataLength)
+                let right = grayAt(ptr, x: x + 1, y: y, bytesPerRow: bytesPerRow, bpp: bytesPerPixel, dataLength: dataLength)
+                let topLeft = grayAt(ptr, x: x - 1, y: y - 1, bytesPerRow: bytesPerRow, bpp: bytesPerPixel, dataLength: dataLength)
+                let topRight = grayAt(ptr, x: x + 1, y: y - 1, bytesPerRow: bytesPerRow, bpp: bytesPerPixel, dataLength: dataLength)
+                let bottomLeft = grayAt(ptr, x: x - 1, y: y + 1, bytesPerRow: bytesPerRow, bpp: bytesPerPixel, dataLength: dataLength)
+                let bottomRight = grayAt(ptr, x: x + 1, y: y + 1, bytesPerRow: bytesPerRow, bpp: bytesPerPixel, dataLength: dataLength)
+
+                guard center >= 0 && top >= 0 && bottom >= 0 && left >= 0 && right >= 0 &&
+                      topLeft >= 0 && topRight >= 0 && bottomLeft >= 0 && bottomRight >= 0 else { continue }
+
+                let laplacian = -1 * topLeft + -1 * top + -1 * topRight +
+                                -1 * left + 8 * center + -1 * right +
+                                -1 * bottomLeft + -1 * bottom + -1 * bottomRight
+
+                highFreqValues.append(laplacian * laplacian)
+            }
+        }
+
+        guard !highFreqValues.isEmpty else { return 200 }
+        return highFreqValues.reduce(0, +) / Double(highFreqValues.count)
     }
 }

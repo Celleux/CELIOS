@@ -54,7 +54,8 @@ nonisolated enum SkinMetricType: String, CaseIterable, Sendable {
 
     var isImplemented: Bool {
         switch self {
-        case .textureEvenness, .apparentHydration, .brightnessRadiance, .rednessInflammation:
+        case .textureEvenness, .apparentHydration, .brightnessRadiance, .rednessInflammation,
+             .poreVisibility, .toneUniformity:
             true
         default:
             false
