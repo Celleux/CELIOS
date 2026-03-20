@@ -80,6 +80,18 @@ enum LightingQuality: String {
     }
 }
 
+nonisolated struct RegionScores: Sendable {
+    var brightnessScore: Double = 0
+    var rednessScore: Double = 0
+    var textureScore: Double = 0
+    var hydrationScore: Double = 0
+    var itaAngle: Double = 0
+    var aStarMean: Double = 0
+    var bStarMean: Double = 0
+    var laplacianVariance: Double = 0
+    var saturationVariance: Double = 0
+}
+
 nonisolated struct SkinAnalysisData: Sendable {
     var brightnessScore: Double = 0
     var rednessScore: Double = 0
@@ -88,8 +100,10 @@ nonisolated struct SkinAnalysisData: Sendable {
     var overallScore: Double = 0
     var itaAngle: Double = 0
     var aStarMean: Double = 0
+    var bStarMean: Double = 0
     var laplacianVariance: Double = 0
     var saturationVariance: Double = 0
+    var regionData: [String: RegionScores] = [:]
 }
 
 struct SkinScanResult: Identifiable {

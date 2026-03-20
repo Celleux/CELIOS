@@ -4,42 +4,64 @@ import Vision
 
 nonisolated class SkinAnalysisService: Sendable {
 
-    func analyze(pixelBuffer: CVPixelBuffer) async -> SkinAnalysisData {
+    func analyze(pixelBuffer: CVPixelBuffer) async -> SkinAnalysisData? {
         let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
         let context = CIContext()
 
         guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else {
-            return SkinAnalysisData()
+            return nil
         }
 
-        let faceRegions = await detectFaceRegions(in: cgImage)
+        let namedRegions = await detectNamedFaceRegions(in: cgImage)
 
-        guard !faceRegions.isEmpty else {
+        guard !namedRegions.isEmpty else {
             return analyzeFullImage(cgImage: cgImage, context: context)
         }
 
+        var regionData: [String: RegionScores] = [:]
         var allBrightness: [Double] = []
         var allRedness: [Double] = []
         var allTexture: [Double] = []
         var allSaturationVar: [Double] = []
+        var allBStar: [Double] = []
 
-        for region in faceRegions {
-            guard let cropped = cgImage.cropping(to: region) else { continue }
-            let metrics = computeRegionMetrics(cgImage: cropped, context: context)
+        for (name, rect) in namedRegions {
+            guard let cropped = cgImage.cropping(to: rect),
+                  let metrics = computeRegionMetrics(cgImage: cropped, context: context) else { continue }
+
+            let bScore = mapITAToScore(metrics.brightness)
+            let rScore = mapRednessToScore(metrics.redness)
+            let tScore = mapTextureToScore(metrics.texture)
+            let hScore = mapHydrationToScore(metrics.saturationVariance)
+
+            regionData[name] = RegionScores(
+                brightnessScore: bScore,
+                rednessScore: rScore,
+                textureScore: tScore,
+                hydrationScore: hScore,
+                itaAngle: metrics.brightness,
+                aStarMean: metrics.redness,
+                bStarMean: metrics.bStar,
+                laplacianVariance: metrics.texture,
+                saturationVariance: metrics.saturationVariance
+            )
+
             allBrightness.append(metrics.brightness)
             allRedness.append(metrics.redness)
             allTexture.append(metrics.texture)
             allSaturationVar.append(metrics.saturationVariance)
+            allBStar.append(metrics.bStar)
         }
 
         guard !allBrightness.isEmpty else {
-            return analyzeFullImage(cgImage: cgImage, context: context)
+            return nil
         }
 
         let avgBrightness = allBrightness.reduce(0, +) / Double(allBrightness.count)
         let avgRedness = allRedness.reduce(0, +) / Double(allRedness.count)
         let avgTexture = allTexture.reduce(0, +) / Double(allTexture.count)
         let avgSatVar = allSaturationVar.reduce(0, +) / Double(allSaturationVar.count)
+        let avgBStar = allBStar.reduce(0, +) / Double(allBStar.count)
 
         let brightnessScore = mapITAToScore(avgBrightness)
         let rednessScore = mapRednessToScore(avgRedness)
@@ -56,12 +78,14 @@ nonisolated class SkinAnalysisService: Sendable {
             overallScore: overall,
             itaAngle: avgBrightness,
             aStarMean: avgRedness,
+            bStarMean: avgBStar,
             laplacianVariance: avgTexture,
-            saturationVariance: avgSatVar
+            saturationVariance: avgSatVar,
+            regionData: regionData
         )
     }
 
-    private func analyzeFullImage(cgImage: CGImage, context: CIContext) -> SkinAnalysisData {
+    private func analyzeFullImage(cgImage: CGImage, context: CIContext) -> SkinAnalysisData? {
         let w = cgImage.width
         let h = cgImage.height
         let centerRect = CGRect(
@@ -70,16 +94,37 @@ nonisolated class SkinAnalysisService: Sendable {
             width: CGFloat(w) * 0.5,
             height: CGFloat(h) * 0.5
         )
-        guard let cropped = cgImage.cropping(to: centerRect) else {
-            return SkinAnalysisData()
+        guard let cropped = cgImage.cropping(to: centerRect),
+              let metrics = computeRegionMetrics(cgImage: cropped, context: context) else {
+            return nil
         }
 
-        let metrics = computeRegionMetrics(cgImage: cropped, context: context)
         let brightnessScore = mapITAToScore(metrics.brightness)
         let rednessScore = mapRednessToScore(metrics.redness)
         let textureScore = mapTextureToScore(metrics.texture)
         let hydrationScore = mapHydrationToScore(metrics.saturationVariance)
         let overall = brightnessScore * 0.25 + rednessScore * 0.20 + textureScore * 0.30 + hydrationScore * 0.25
+
+        let scores = RegionScores(
+            brightnessScore: brightnessScore,
+            rednessScore: rednessScore,
+            textureScore: textureScore,
+            hydrationScore: hydrationScore,
+            itaAngle: metrics.brightness,
+            aStarMean: metrics.redness,
+            bStarMean: metrics.bStar,
+            laplacianVariance: metrics.texture,
+            saturationVariance: metrics.saturationVariance
+        )
+
+        let regionData: [String: RegionScores] = [
+            "Forehead": scores,
+            "Left Cheek": scores,
+            "Right Cheek": scores,
+            "Chin": scores,
+            "Under-Eyes": scores,
+            "Nose": scores
+        ]
 
         return SkinAnalysisData(
             brightnessScore: brightnessScore,
@@ -89,12 +134,14 @@ nonisolated class SkinAnalysisService: Sendable {
             overallScore: overall,
             itaAngle: metrics.brightness,
             aStarMean: metrics.redness,
+            bStarMean: metrics.bStar,
             laplacianVariance: metrics.texture,
-            saturationVariance: metrics.saturationVariance
+            saturationVariance: metrics.saturationVariance,
+            regionData: regionData
         )
     }
 
-    private func detectFaceRegions(in cgImage: CGImage) async -> [CGRect] {
+    private func detectNamedFaceRegions(in cgImage: CGImage) async -> [(String, CGRect)] {
         await withCheckedContinuation { continuation in
             let request = VNDetectFaceLandmarksRequest { request, _ in
                 guard let observations = request.results as? [VNFaceObservation],
@@ -114,7 +161,7 @@ nonisolated class SkinAnalysisService: Sendable {
                     height: faceBox.height * h
                 )
 
-                var regions: [CGRect] = []
+                var regions: [(String, CGRect)] = []
                 let imageBounds = CGRect(x: 0, y: 0, width: w, height: h)
 
                 let foreheadRect = CGRect(
@@ -145,9 +192,32 @@ nonisolated class SkinAnalysisService: Sendable {
                     height: faceRect.height * 0.12
                 ).intersection(imageBounds)
 
-                for r in [foreheadRect, leftCheek, rightCheek, chin] {
+                let underEye = CGRect(
+                    x: faceRect.midX - faceRect.width * 0.25,
+                    y: faceRect.midY + faceRect.height * 0.05,
+                    width: faceRect.width * 0.5,
+                    height: faceRect.height * 0.08
+                ).intersection(imageBounds)
+
+                let nose = CGRect(
+                    x: faceRect.midX - faceRect.width * 0.1,
+                    y: faceRect.midY - faceRect.height * 0.15,
+                    width: faceRect.width * 0.2,
+                    height: faceRect.height * 0.2
+                ).intersection(imageBounds)
+
+                let namedRects: [(String, CGRect)] = [
+                    ("Forehead", foreheadRect),
+                    ("Left Cheek", leftCheek),
+                    ("Right Cheek", rightCheek),
+                    ("Chin", chin),
+                    ("Under-Eyes", underEye),
+                    ("Nose", nose)
+                ]
+
+                for (name, r) in namedRects {
                     if r.width > 5 && r.height > 5 {
-                        regions.append(r)
+                        regions.append((name, r))
                     }
                 }
 
@@ -163,14 +233,15 @@ nonisolated class SkinAnalysisService: Sendable {
         }
     }
 
-    private nonisolated struct RegionMetrics: Sendable {
+    private nonisolated struct InternalRegionMetrics: Sendable {
         let brightness: Double
         let redness: Double
+        let bStar: Double
         let texture: Double
         let saturationVariance: Double
     }
 
-    private func computeRegionMetrics(cgImage: CGImage, context: CIContext) -> RegionMetrics {
+    private func computeRegionMetrics(cgImage: CGImage, context: CIContext) -> InternalRegionMetrics? {
         let width = cgImage.width
         let height = cgImage.height
         let totalPixels = width * height
@@ -178,7 +249,7 @@ nonisolated class SkinAnalysisService: Sendable {
         guard totalPixels > 0,
               let data = cgImage.dataProvider?.data,
               let ptr = CFDataGetBytePtr(data) else {
-            return RegionMetrics(brightness: 40, redness: 14, texture: 300, saturationVariance: 0.02)
+            return nil
         }
 
         let bytesPerPixel = cgImage.bitsPerPixel / 8
@@ -186,6 +257,7 @@ nonisolated class SkinAnalysisService: Sendable {
 
         var lStarSum: Double = 0
         var aStarSum: Double = 0
+        var bStarSum: Double = 0
         var satValues: [Double] = []
         var sampleCount = 0
 
@@ -205,6 +277,7 @@ nonisolated class SkinAnalysisService: Sendable {
             let lab = rgbToLab(r: r, g: g, b: b)
             lStarSum += lab.l
             aStarSum += lab.a
+            bStarSum += lab.b_
 
             let maxC = max(r, max(g, b))
             let minC = min(r, min(g, b))
@@ -215,21 +288,23 @@ nonisolated class SkinAnalysisService: Sendable {
         }
 
         guard sampleCount > 0 else {
-            return RegionMetrics(brightness: 40, redness: 14, texture: 300, saturationVariance: 0.02)
+            return nil
         }
 
         let meanL = lStarSum / Double(sampleCount)
         let meanA = aStarSum / Double(sampleCount)
-        let ita = atan2(meanL - 50, meanA) * (180.0 / .pi)
+        let meanB = bStarSum / Double(sampleCount)
+        let ita = atan2(meanL - 50, meanB) * (180.0 / .pi)
 
         let meanSat = satValues.reduce(0, +) / Double(satValues.count)
         let satVar = satValues.reduce(0) { $0 + ($1 - meanSat) * ($1 - meanSat) } / Double(satValues.count)
 
         let textureVar = computeTextureVariance(ptr: ptr, width: width, height: height, bytesPerRow: bytesPerRow, bytesPerPixel: bytesPerPixel, dataLength: CFDataGetLength(data))
 
-        return RegionMetrics(
+        return InternalRegionMetrics(
             brightness: ita,
             redness: meanA,
+            bStar: meanB,
             texture: textureVar,
             saturationVariance: satVar
         )

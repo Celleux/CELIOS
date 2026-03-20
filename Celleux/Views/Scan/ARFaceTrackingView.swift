@@ -7,6 +7,7 @@ struct ARFaceTrackingView: UIViewRepresentable {
     let scanProgress: Double
     let heatMapMode: HeatMapMode
     let showHeatMap: Bool
+    let regionScores: [String: RegionScores]
     var onFaceDetected: ((Bool) -> Void)?
     var onFrameCaptured: ((CVPixelBuffer) -> Void)?
 
@@ -34,6 +35,7 @@ struct ARFaceTrackingView: UIViewRepresentable {
         context.coordinator.scanProgress = scanProgress
         context.coordinator.heatMapMode = heatMapMode
         context.coordinator.showHeatMap = showHeatMap
+        context.coordinator.regionScores = regionScores
         context.coordinator.onFaceDetected = onFaceDetected
         context.coordinator.onFrameCaptured = onFrameCaptured
         context.coordinator.updateMeshAppearance()
@@ -53,6 +55,7 @@ struct ARFaceTrackingView: UIViewRepresentable {
         var scanProgress: Double = 0
         var heatMapMode: HeatMapMode = .all
         var showHeatMap: Bool = false
+        var regionScores: [String: RegionScores] = [:]
         var onFaceDetected: ((Bool) -> Void)?
         var onFrameCaptured: ((CVPixelBuffer) -> Void)?
 
@@ -65,7 +68,10 @@ struct ARFaceTrackingView: UIViewRepresentable {
         private var landmarkDots: [SCNNode] = []
         private var orbitParticles: [SCNNode] = []
         private var hasCapturedFrame: Bool = false
+        private var captureRetryCount: Int = 0
         private var lastUpdateTime: TimeInterval = 0
+
+        private let captureThresholds: [Double] = [0.8, 0.85, 0.9, 0.95]
 
         private let whiteGold = UIColor(red: 0.91, green: 0.84, blue: 0.67, alpha: 1.0)
         private let brightGold = UIColor(red: 0.85, green: 0.75, blue: 0.50, alpha: 1.0)
@@ -123,7 +129,12 @@ struct ARFaceTrackingView: UIViewRepresentable {
 
         nonisolated func session(_ session: ARSession, didUpdate frame: ARFrame) {
             Task { @MainActor in
-                if self.isScanning && self.scanProgress > 0.8 && !self.hasCapturedFrame {
+                guard self.isScanning && !self.hasCapturedFrame else { return }
+
+                let thresholdIndex = self.captureRetryCount
+                guard thresholdIndex < self.captureThresholds.count else { return }
+
+                if self.scanProgress >= self.captureThresholds[thresholdIndex] {
                     self.hasCapturedFrame = true
                     self.onFrameCaptured?(frame.capturedImage)
                 }
@@ -172,6 +183,7 @@ struct ARFaceTrackingView: UIViewRepresentable {
                 meshRevealNode?.removeFromParentNode()
                 meshRevealNode = nil
                 hasCapturedFrame = false
+                captureRetryCount = 0
 
                 for particle in orbitParticles {
                     particle.isHidden = true
@@ -484,81 +496,101 @@ struct ARFaceTrackingView: UIViewRepresentable {
             self.heatMapNode = newHeatNode
         }
 
-        private func heatMapColorForVertex(position: SIMD3<Float>, mode: HeatMapMode) -> SIMD4<Float> {
+        private func classifyRegion(position: SIMD3<Float>) -> (primary: String, secondary: String?, blendFactor: Float) {
             let x = position.x
             let y = position.y
 
-            var rednessIntensity: Float = 0
-            var textureIntensity: Float = 0
-            var darkSpotIntensity: Float = 0
-            var dehydrationIntensity: Float = 0
-
-            let cheekZone = abs(x) > 0.025 && y < 0.02 && y > -0.04
-            if cheekZone {
-                rednessIntensity = max(0, 1.0 - abs(x - 0.04) * 8) * 0.7
+            if y > 0.03 && abs(x) < 0.05 {
+                return ("Forehead", nil, 0)
             }
 
-            let foreheadZone = y > 0.03 && abs(x) < 0.05
-            if foreheadZone {
-                textureIntensity = max(0, (y - 0.03) * 12) * 0.6
+            if abs(x) > 0.015 && abs(x) < 0.045 && y > -0.005 && y < 0.025 {
+                return ("Under-Eyes", nil, 0)
             }
 
-            let underEyeZone = abs(x) > 0.015 && abs(x) < 0.045 && y > -0.005 && y < 0.02
-            if underEyeZone {
-                darkSpotIntensity = max(0, 1.0 - abs(y - 0.01) * 30) * 0.5
+            if abs(x) > 0.005 && abs(x) < 0.025 && y > -0.025 && y < 0.015 {
+                let distFromNoseCenter = abs(x) / 0.025
+                if distFromNoseCenter < 0.6 {
+                    return ("Nose", nil, 0)
+                }
+                let cheekName = x < 0 ? "Left Cheek" : "Right Cheek"
+                return ("Nose", cheekName, Float(distFromNoseCenter - 0.6) / 0.4)
             }
 
-            let jawZone = y < -0.03 && abs(x) < 0.06
-            if jawZone {
-                dehydrationIntensity = max(0, (-0.03 - y) * 8) * 0.5
+            if x < -0.025 && y < 0.03 && y > -0.03 {
+                return ("Left Cheek", nil, 0)
+            }
+            if x > 0.025 && y < 0.03 && y > -0.03 {
+                return ("Right Cheek", nil, 0)
             }
 
-            let noseSide = abs(x) > 0.005 && abs(x) < 0.02 && y > -0.025 && y < 0.01
-            if noseSide {
-                textureIntensity = max(textureIntensity, 0.4)
+            if y < -0.03 && abs(x) < 0.04 {
+                return ("Chin", nil, 0)
             }
 
-            let chinZone = y < -0.04 && abs(x) < 0.03
-            if chinZone {
-                rednessIntensity = max(rednessIntensity, 0.3)
+            if y > 0.01 {
+                return ("Forehead", nil, 0)
+            }
+            if y < -0.02 {
+                return ("Chin", nil, 0)
             }
 
-            var r: Float = 0
-            var g: Float = 0
-            var b: Float = 0
-            var a: Float = 0
+            let cheekName = x < 0 ? "Left Cheek" : "Right Cheek"
+            return (cheekName, nil, 0)
+        }
+
+        private func scoreForRegionAndMode(_ regionName: String, mode: HeatMapMode) -> Float {
+            guard let scores = regionScores[regionName] else { return 0.5 }
 
             switch mode {
             case .all:
-                r = rednessIntensity * 0.95 + textureIntensity * 0.88 + darkSpotIntensity * 0.82 + dehydrationIntensity * 0.78
-                g = rednessIntensity * 0.55 + textureIntensity * 0.82 + darkSpotIntensity * 0.80 + dehydrationIntensity * 0.80
-                b = rednessIntensity * 0.40 + textureIntensity * 0.62 + darkSpotIntensity * 0.85 + dehydrationIntensity * 0.85
-                a = max(rednessIntensity, max(textureIntensity, max(darkSpotIntensity, dehydrationIntensity))) * 0.45
+                let avg = (scores.brightnessScore + scores.rednessScore + scores.textureScore + scores.hydrationScore) / 4.0
+                return Float(max(0, min(1, avg / 100.0)))
             case .redness:
-                r = rednessIntensity * 0.95
-                g = rednessIntensity * 0.60
-                b = rednessIntensity * 0.45
-                a = rednessIntensity * 0.55
+                return Float(max(0, min(1, scores.rednessScore / 100.0)))
             case .texture:
-                r = textureIntensity * 0.92
-                g = textureIntensity * 0.85
-                b = textureIntensity * 0.62
-                a = textureIntensity * 0.55
+                return Float(max(0, min(1, scores.textureScore / 100.0)))
             case .darkSpots:
-                r = darkSpotIntensity * 0.82
-                g = darkSpotIntensity * 0.80
-                b = darkSpotIntensity * 0.88
-                a = darkSpotIntensity * 0.55
+                return Float(max(0, min(1, scores.brightnessScore / 100.0)))
             case .dehydration:
-                r = dehydrationIntensity * 0.78
-                g = dehydrationIntensity * 0.80
-                b = dehydrationIntensity * 0.88
-                a = dehydrationIntensity * 0.55
+                return Float(max(0, min(1, scores.hydrationScore / 100.0)))
+            }
+        }
+
+        private func heatMapColorForVertex(position: SIMD3<Float>, mode: HeatMapMode) -> SIMD4<Float> {
+            guard !regionScores.isEmpty else {
+                return SIMD4<Float>(0, 0, 0, 0)
             }
 
+            let classification = classifyRegion(position: position)
+            let primaryScore = scoreForRegionAndMode(classification.primary, mode: mode)
+
+            var finalScore: Float
+            if let secondary = classification.secondary {
+                let secondaryScore = scoreForRegionAndMode(secondary, mode: mode)
+                finalScore = primaryScore * (1 - classification.blendFactor) + secondaryScore * classification.blendFactor
+            } else {
+                finalScore = primaryScore
+            }
+
+            let invertedScore = 1.0 - finalScore
+
+            let goldR: Float = 0.91
+            let goldG: Float = 0.84
+            let goldB: Float = 0.67
+            let warmRedR: Float = 0.95
+            let warmRedG: Float = 0.55
+            let warmRedB: Float = 0.40
+
+            let r = goldR * finalScore + warmRedR * invertedScore
+            let g = goldG * finalScore + warmRedG * invertedScore
+            let b = goldB * finalScore + warmRedB * invertedScore
+
+            let intensity = max(0.15, invertedScore * 0.6)
+
             let time = Float(CACurrentMediaTime())
-            let pulse = (sin(time * 2.0 + x * 20 + y * 15) * 0.15 + 1.0)
-            a *= pulse
+            let pulse = (sin(time * 2.0 + position.x * 20 + position.y * 15) * 0.1 + 1.0)
+            let a = intensity * pulse
 
             return SIMD4<Float>(r, g, b, a)
         }

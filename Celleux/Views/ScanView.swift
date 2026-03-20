@@ -307,6 +307,7 @@ struct ScanView: View {
                         scanProgress: viewModel.scanProgress,
                         heatMapMode: viewModel.heatMapMode,
                         showHeatMap: showHeatMap,
+                        regionScores: viewModel.latestRegionScores,
                         onFaceDetected: { detected in
                             viewModel.onFaceDetected(detected)
                         },
@@ -344,6 +345,33 @@ struct ScanView: View {
 
             if isScanning {
                 scanningOverlayContent
+            }
+
+            if let error = viewModel.scanError {
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 32, weight: .light))
+                        .foregroundStyle(CelleuxColors.warmGold)
+                    Text(error)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(CelleuxColors.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                }
+                .padding(20)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(.ultraThinMaterial)
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                .onAppear {
+                    Task {
+                        try? await Task.sleep(for: .seconds(3))
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
+                            viewModel.scanError = nil
+                        }
+                    }
+                }
             }
         }
         .shadow(color: showHeatMap ? Color(hex: "E8D6A8").opacity(0.1) : Color.black.opacity(0.04), radius: showHeatMap ? 20 : 1, x: 0, y: showHeatMap ? 0 : 1)
