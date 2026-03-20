@@ -60,10 +60,15 @@ final class SkinScanViewModel {
                 metrics: buildMetricsFromRecord(record, prevRecord: prevRecord),
                 trend: trend,
                 analysisData: SkinAnalysisData(
-                    brightnessScore: record.brightnessScore,
+                    textureEvennessScore: record.textureEvennessScore,
+                    apparentHydrationScore: record.apparentHydrationScore,
+                    brightnessRadianceScore: record.brightnessRadianceScore,
                     rednessScore: record.rednessScore,
-                    textureScore: record.textureScore,
-                    hydrationScore: record.hydrationScore,
+                    poreVisibilityScore: record.poreVisibilityScore,
+                    toneUniformityScore: record.toneUniformityScore,
+                    underEyeQualityScore: record.underEyeQualityScore,
+                    wrinkleDepthScore: record.wrinkleDepthScore,
+                    elasticityProxyScore: record.elasticityProxyScore,
                     overallScore: Double(record.overallScore),
                     bStarMean: record.bStarMean,
                     regionData: extractRegionDataFromRecord(record)
@@ -77,7 +82,7 @@ final class SkinScanViewModel {
         let regionNames = ["Forehead", "Left Cheek", "Right Cheek", "Chin", "Under-Eyes", "Nose"]
         for name in regionNames {
             let scores = record.regionScores(for: name)
-            if scores.brightnessScore > 0 || scores.rednessScore > 0 || scores.textureScore > 0 || scores.hydrationScore > 0 {
+            if scores.textureEvennessScore > 0 || scores.rednessScore > 0 || scores.brightnessRadianceScore > 0 || scores.apparentHydrationScore > 0 {
                 data[name] = scores
             }
         }
@@ -112,21 +117,43 @@ final class SkinScanViewModel {
     }
 
     private func buildMetricsFromRecord(_ record: SkinScanRecord, prevRecord: SkinScanRecord?) -> [SkinMetric] {
-        [
-            SkinMetric(name: "Texture Evenness", score: Int(record.textureScore.rounded()), previousScore: prevRecord.map { Int($0.textureScore.rounded()) }, icon: "square.grid.3x3"),
-            SkinMetric(name: "Apparent Hydration", score: Int(record.hydrationScore.rounded()), previousScore: prevRecord.map { Int($0.hydrationScore.rounded()) }, icon: "drop.fill"),
-            SkinMetric(name: "Brightness", score: Int(record.brightnessScore.rounded()), previousScore: prevRecord.map { Int($0.brightnessScore.rounded()) }, icon: "sun.max.fill"),
-            SkinMetric(name: "Redness", score: Int(record.rednessScore.rounded()), previousScore: prevRecord.map { Int($0.rednessScore.rounded()) }, icon: "flame"),
-        ]
+        var metrics: [SkinMetric] = []
+        for metricType in SkinMetricType.allCases where metricType != .overallSkinHealth && metricType.isImplemented {
+            let current = scoreFromRecord(record, metric: metricType)
+            let previous = prevRecord.map { scoreFromRecord($0, metric: metricType) }
+            metrics.append(SkinMetric(
+                name: metricType.rawValue,
+                score: Int(current.rounded()),
+                previousScore: previous.map { Int($0.rounded()) },
+                icon: metricType.icon
+            ))
+        }
+        return metrics
+    }
+
+    private func scoreFromRecord(_ record: SkinScanRecord, metric: SkinMetricType) -> Double {
+        switch metric {
+        case .textureEvenness: record.textureEvennessScore
+        case .apparentHydration: record.apparentHydrationScore
+        case .brightnessRadiance: record.brightnessRadianceScore
+        case .rednessInflammation: record.rednessScore
+        case .poreVisibility: record.poreVisibilityScore
+        case .toneUniformity: record.toneUniformityScore
+        case .underEyeQuality: record.underEyeQualityScore
+        case .wrinkleDepth: record.wrinkleDepthScore
+        case .elasticityProxy: record.elasticityProxyScore
+        case .overallSkinHealth: Double(record.overallScore)
+        }
     }
 
     private func primaryScore(for keyMetric: String, from scores: RegionScores) -> Int {
         switch keyMetric {
-        case "Texture", "Pores": return Int(scores.textureScore.rounded())
-        case "Hydration": return Int(scores.hydrationScore.rounded())
+        case "Texture": return Int(scores.textureEvennessScore.rounded())
+        case "Pores": return Int(scores.poreVisibilityScore > 0 ? scores.poreVisibilityScore.rounded() : scores.textureEvennessScore.rounded())
+        case "Hydration": return Int(scores.apparentHydrationScore.rounded())
         case "Clarity": return Int(scores.rednessScore.rounded())
-        case "Dark Circles": return Int(scores.brightnessScore.rounded())
-        default: return Int(scores.brightnessScore.rounded())
+        case "Dark Circles": return Int(scores.underEyeQualityScore > 0 ? scores.underEyeQualityScore.rounded() : scores.brightnessRadianceScore.rounded())
+        default: return Int(scores.brightnessRadianceScore.rounded())
         }
     }
 
@@ -204,50 +231,32 @@ final class SkinScanViewModel {
     }
 
     private func saveToSwiftData(analysis: SkinAnalysisData, modelContext: ModelContext) {
-        let forehead = analysis.regionData["Forehead"] ?? RegionScores()
-        let leftCheek = analysis.regionData["Left Cheek"] ?? RegionScores()
-        let rightCheek = analysis.regionData["Right Cheek"] ?? RegionScores()
-        let chin = analysis.regionData["Chin"] ?? RegionScores()
-        let underEye = analysis.regionData["Under-Eyes"] ?? RegionScores()
-        let nose = analysis.regionData["Nose"] ?? RegionScores()
-
         let record = SkinScanRecord(
             date: Date(),
             overallScore: Int(analysis.overallScore.rounded()),
-            brightnessScore: analysis.brightnessScore,
+            textureEvennessScore: analysis.textureEvennessScore,
+            apparentHydrationScore: analysis.apparentHydrationScore,
+            brightnessRadianceScore: analysis.brightnessRadianceScore,
             rednessScore: analysis.rednessScore,
-            textureScore: analysis.textureScore,
-            hydrationScore: analysis.hydrationScore,
+            poreVisibilityScore: analysis.poreVisibilityScore,
+            toneUniformityScore: analysis.toneUniformityScore,
+            underEyeQualityScore: analysis.underEyeQualityScore,
+            wrinkleDepthScore: analysis.wrinkleDepthScore,
+            elasticityProxyScore: analysis.elasticityProxyScore,
             itaAngle: analysis.itaAngle,
             aStarMean: analysis.aStarMean,
             bStarMean: analysis.bStarMean,
             laplacianVariance: analysis.laplacianVariance,
-            saturationVariance: analysis.saturationVariance,
-            foreheadBrightness: forehead.brightnessScore,
-            foreheadRedness: forehead.rednessScore,
-            foreheadTexture: forehead.textureScore,
-            foreheadHydration: forehead.hydrationScore,
-            leftCheekBrightness: leftCheek.brightnessScore,
-            leftCheekRedness: leftCheek.rednessScore,
-            leftCheekTexture: leftCheek.textureScore,
-            leftCheekHydration: leftCheek.hydrationScore,
-            rightCheekBrightness: rightCheek.brightnessScore,
-            rightCheekRedness: rightCheek.rednessScore,
-            rightCheekTexture: rightCheek.textureScore,
-            rightCheekHydration: rightCheek.hydrationScore,
-            chinBrightness: chin.brightnessScore,
-            chinRedness: chin.rednessScore,
-            chinTexture: chin.textureScore,
-            chinHydration: chin.hydrationScore,
-            underEyeBrightness: underEye.brightnessScore,
-            underEyeRedness: underEye.rednessScore,
-            underEyeTexture: underEye.textureScore,
-            underEyeHydration: underEye.hydrationScore,
-            noseBrightness: nose.brightnessScore,
-            noseRedness: nose.rednessScore,
-            noseTexture: nose.textureScore,
-            noseHydration: nose.hydrationScore
+            saturationVariance: analysis.saturationVariance
         )
+
+        let regionNames = ["Forehead", "Left Cheek", "Right Cheek", "Chin", "Under-Eyes", "Nose"]
+        for name in regionNames {
+            if let scores = analysis.regionData[name] {
+                record.storeRegionScores(scores, for: name)
+            }
+        }
+
         modelContext.insert(record)
         UserDefaults.standard.set(Int(analysis.overallScore.rounded()), forKey: "latestSkinScore")
 
@@ -339,10 +348,10 @@ final class SkinScanViewModel {
 
         let regions: [SkinRegionResult] = regionDefs.map { def in
             let regionScores = analysis.regionData[def.name] ?? RegionScores(
-                brightnessScore: analysis.brightnessScore,
-                rednessScore: analysis.rednessScore,
-                textureScore: analysis.textureScore,
-                hydrationScore: analysis.hydrationScore
+                textureEvennessScore: analysis.textureEvennessScore,
+                apparentHydrationScore: analysis.apparentHydrationScore,
+                brightnessRadianceScore: analysis.brightnessRadianceScore,
+                rednessScore: analysis.rednessScore
             )
             let score = primaryScore(for: def.keyMetric, from: regionScores)
             let prevRegion = prevResult?.regions.first { $0.name == def.name }
@@ -362,12 +371,15 @@ final class SkinScanViewModel {
             prevMetrics?.first { $0.name == name }?.score
         }
 
-        let metrics: [SkinMetric] = [
-            SkinMetric(name: "Texture Evenness", score: Int(analysis.textureScore.rounded()), previousScore: prevScore(for: "Texture Evenness"), icon: "square.grid.3x3"),
-            SkinMetric(name: "Apparent Hydration", score: Int(analysis.hydrationScore.rounded()), previousScore: prevScore(for: "Apparent Hydration"), icon: "drop.fill"),
-            SkinMetric(name: "Brightness", score: Int(analysis.brightnessScore.rounded()), previousScore: prevScore(for: "Brightness"), icon: "sun.max.fill"),
-            SkinMetric(name: "Redness", score: Int(analysis.rednessScore.rounded()), previousScore: prevScore(for: "Redness"), icon: "flame"),
-        ]
+        var metrics: [SkinMetric] = []
+        for metricType in SkinMetricType.allCases where metricType != .overallSkinHealth && metricType.isImplemented {
+            metrics.append(SkinMetric(
+                name: metricType.rawValue,
+                score: Int(analysis.score(for: metricType).rounded()),
+                previousScore: prevScore(for: metricType.rawValue),
+                icon: metricType.icon
+            ))
+        }
 
         let trend: Double
         if let prev = prevResult {

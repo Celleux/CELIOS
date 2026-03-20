@@ -10,6 +10,58 @@ nonisolated enum ScanPhase: String, Sendable {
     case progress
 }
 
+nonisolated enum SkinMetricType: String, CaseIterable, Sendable {
+    case textureEvenness = "Texture Evenness"
+    case apparentHydration = "Apparent Hydration"
+    case brightnessRadiance = "Brightness"
+    case rednessInflammation = "Redness"
+    case poreVisibility = "Pore Visibility"
+    case toneUniformity = "Tone Uniformity"
+    case underEyeQuality = "Under-Eye Quality"
+    case wrinkleDepth = "Wrinkle Depth"
+    case elasticityProxy = "Elasticity"
+    case overallSkinHealth = "Overall Skin Health"
+
+    var icon: String {
+        switch self {
+        case .textureEvenness: "square.grid.3x3"
+        case .apparentHydration: "drop.fill"
+        case .brightnessRadiance: "sun.max.fill"
+        case .rednessInflammation: "flame"
+        case .poreVisibility: "circle.grid.3x3"
+        case .toneUniformity: "paintpalette"
+        case .underEyeQuality: "eye"
+        case .wrinkleDepth: "line.3.horizontal.decrease"
+        case .elasticityProxy: "arrow.up.and.down.and.sparkles"
+        case .overallSkinHealth: "heart.text.clipboard"
+        }
+    }
+
+    var weight: Double {
+        switch self {
+        case .textureEvenness: 0.20
+        case .apparentHydration: 0.15
+        case .brightnessRadiance: 0.10
+        case .rednessInflammation: 0.15
+        case .poreVisibility: 0.10
+        case .toneUniformity: 0.10
+        case .underEyeQuality: 0.05
+        case .wrinkleDepth: 0.10
+        case .elasticityProxy: 0.05
+        case .overallSkinHealth: 0
+        }
+    }
+
+    var isImplemented: Bool {
+        switch self {
+        case .textureEvenness, .apparentHydration, .brightnessRadiance, .rednessInflammation:
+            true
+        default:
+            false
+        }
+    }
+}
+
 nonisolated enum SkinConcernType: String, CaseIterable, Sendable {
     case redness = "Redness"
     case texture = "Texture"
@@ -81,29 +133,87 @@ enum LightingQuality: String {
 }
 
 nonisolated struct RegionScores: Sendable {
-    var brightnessScore: Double = 0
+    var textureEvennessScore: Double = 0
+    var apparentHydrationScore: Double = 0
+    var brightnessRadianceScore: Double = 0
     var rednessScore: Double = 0
-    var textureScore: Double = 0
-    var hydrationScore: Double = 0
+    var poreVisibilityScore: Double = 0
+    var toneUniformityScore: Double = 0
+    var underEyeQualityScore: Double = 0
+    var wrinkleDepthScore: Double = 0
+    var elasticityProxyScore: Double = 0
+
     var itaAngle: Double = 0
     var aStarMean: Double = 0
     var bStarMean: Double = 0
     var laplacianVariance: Double = 0
     var saturationVariance: Double = 0
+
+    var brightnessScore: Double { brightnessRadianceScore }
+    var textureScore: Double { textureEvennessScore }
+    var hydrationScore: Double { apparentHydrationScore }
+
+    func score(for metric: SkinMetricType) -> Double {
+        switch metric {
+        case .textureEvenness: textureEvennessScore
+        case .apparentHydration: apparentHydrationScore
+        case .brightnessRadiance: brightnessRadianceScore
+        case .rednessInflammation: rednessScore
+        case .poreVisibility: poreVisibilityScore
+        case .toneUniformity: toneUniformityScore
+        case .underEyeQuality: underEyeQualityScore
+        case .wrinkleDepth: wrinkleDepthScore
+        case .elasticityProxy: elasticityProxyScore
+        case .overallSkinHealth: 0
+        }
+    }
 }
 
 nonisolated struct SkinAnalysisData: Sendable {
-    var brightnessScore: Double = 0
+    var textureEvennessScore: Double = 0
+    var apparentHydrationScore: Double = 0
+    var brightnessRadianceScore: Double = 0
     var rednessScore: Double = 0
-    var textureScore: Double = 0
-    var hydrationScore: Double = 0
+    var poreVisibilityScore: Double = 0
+    var toneUniformityScore: Double = 0
+    var underEyeQualityScore: Double = 0
+    var wrinkleDepthScore: Double = 0
+    var elasticityProxyScore: Double = 0
     var overallScore: Double = 0
+
     var itaAngle: Double = 0
     var aStarMean: Double = 0
     var bStarMean: Double = 0
     var laplacianVariance: Double = 0
     var saturationVariance: Double = 0
     var regionData: [String: RegionScores] = [:]
+
+    var brightnessScore: Double { brightnessRadianceScore }
+    var textureScore: Double { textureEvennessScore }
+    var hydrationScore: Double { apparentHydrationScore }
+
+    func score(for metric: SkinMetricType) -> Double {
+        switch metric {
+        case .textureEvenness: textureEvennessScore
+        case .apparentHydration: apparentHydrationScore
+        case .brightnessRadiance: brightnessRadianceScore
+        case .rednessInflammation: rednessScore
+        case .poreVisibility: poreVisibilityScore
+        case .toneUniformity: toneUniformityScore
+        case .underEyeQuality: underEyeQualityScore
+        case .wrinkleDepth: wrinkleDepthScore
+        case .elasticityProxy: elasticityProxyScore
+        case .overallSkinHealth: overallScore
+        }
+    }
+
+    static func computeOverall(from data: SkinAnalysisData) -> Double {
+        let implementedMetrics = SkinMetricType.allCases.filter { $0.isImplemented }
+        let totalWeight = implementedMetrics.reduce(0.0) { $0 + $1.weight }
+        guard totalWeight > 0 else { return 0 }
+        let weightedSum = implementedMetrics.reduce(0.0) { $0 + data.score(for: $1) * $1.weight }
+        return weightedSum / totalWeight
+    }
 }
 
 struct SkinScanResult: Identifiable {
