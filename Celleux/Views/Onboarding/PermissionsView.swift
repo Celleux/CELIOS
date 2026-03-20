@@ -10,27 +10,41 @@ struct PermissionsView: View {
         VStack(spacing: 0) {
             Spacer()
 
-            VStack(spacing: 8) {
-                Text("Almost there")
-                    .font(.system(size: 30, weight: .bold))
+            VStack(spacing: CelleuxSpacing.sm) {
+                Text("Enable Your Intelligence")
+                    .font(.system(size: 28, weight: .light))
+                    .tracking(0.5)
                     .foregroundStyle(CelleuxColors.textPrimary)
 
-                Text("Enable features for the best experience")
-                    .font(.system(size: 15, weight: .regular))
+                Text("Power up your skin analysis engine")
+                    .font(CelleuxType.body)
                     .foregroundStyle(CelleuxColors.textSecondary)
             }
             .staggeredAppear(appeared: appeared, delay: 0)
 
             Spacer()
-                .frame(height: 40)
+                .frame(height: CelleuxSpacing.xl)
 
-            VStack(spacing: 16) {
+            VStack(spacing: CelleuxSpacing.md) {
                 permissionCard(
-                    icon: "applewatch",
-                    title: "Apple Watch & Health",
-                    description: "Track sleep, HRV, and recovery to power your Longevity Score",
-                    isEnabled: viewModel.healthConnected,
+                    icon: "faceid",
+                    title: "Face Scan Engine",
+                    description: "ARKit-powered skin analysis with 10 precision metrics",
+                    isEnabled: viewModel.cameraEnabled,
                     delay: 0.05
+                ) {
+                    hapticTrigger += 1
+                    Task {
+                        await viewModel.requestCameraPermission()
+                    }
+                }
+
+                permissionCard(
+                    icon: "heart.fill",
+                    title: "Body Intelligence",
+                    description: "Sleep, HRV, and recovery data power your Longevity Score",
+                    isEnabled: viewModel.healthConnected,
+                    delay: 0.1
                 ) {
                     hapticTrigger += 1
                     Task {
@@ -39,66 +53,55 @@ struct PermissionsView: View {
                 }
 
                 permissionCard(
-                    icon: "bell.badge",
-                    title: "Notifications",
-                    description: "Gentle reminders for your optimal supplement timing",
+                    icon: "bell.badge.fill",
+                    title: "Smart Reminders",
+                    description: "Circadian-timed notifications for optimal supplement timing",
                     isEnabled: viewModel.notificationsEnabled,
-                    delay: 0.1
+                    delay: 0.15
                 ) {
                     hapticTrigger += 1
                     Task {
                         await viewModel.requestNotificationPermission()
                     }
                 }
-
-                permissionCard(
-                    icon: "camera",
-                    title: "Camera",
-                    description: "Your photos never leave your device — all analysis is on-device",
-                    isEnabled: viewModel.cameraEnabled,
-                    delay: 0.15
-                ) {
-                    hapticTrigger += 1
-                    Task {
-                        await viewModel.requestCameraPermission()
-                    }
-                }
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, CelleuxSpacing.lg)
 
             Spacer()
             Spacer()
 
             VStack(spacing: 14) {
                 Button {
+                    hapticTrigger += 1
                     onContinue()
                 } label: {
-                    Text("Get Started")
-                        .font(.system(size: 16, weight: .semibold))
-                        .tracking(0.3)
+                    Text("Continue")
+                        .font(.system(size: 16, weight: .medium))
+                        .tracking(0.5)
                         .foregroundStyle(CelleuxColors.textPrimary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 18)
                 }
-                .buttonStyle(GlassButtonStyle())
+                .buttonStyle(Premium3DButtonStyle())
                 .sensoryFeedback(.impact(flexibility: .soft), trigger: hapticTrigger)
 
                 Button {
                     onContinue()
                 } label: {
                     Text("Skip for now")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(CelleuxColors.textLabel)
+                        .font(CelleuxType.caption)
+                        .tracking(CelleuxType.captionTracking)
+                        .foregroundStyle(CelleuxColors.silver)
                 }
             }
             .staggeredAppear(appeared: appeared, delay: 0.25)
-            .padding(.horizontal, 24)
+            .padding(.horizontal, CelleuxSpacing.lg)
             .padding(.bottom, 40)
         }
         .sensoryFeedback(.selection, trigger: hapticTrigger)
         .task {
             await viewModel.checkExistingPermissions()
-            withAnimation(.spring(response: 0.8, dampingFraction: 0.75)) {
+            withAnimation(CelleuxSpring.luxury) {
                 appeared = true
             }
         }
@@ -113,12 +116,35 @@ struct PermissionsView: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            HStack(spacing: 16) {
-                GlowingAccentBadge(icon, color: isEnabled ? CelleuxColors.warmGold : CelleuxColors.silver, size: 48)
+            HStack(spacing: CelleuxSpacing.md) {
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.9))
+                        .frame(width: 48, height: 48)
+
+                    Circle()
+                        .stroke(
+                            isEnabled ? CelleuxColors.goldChromeBorder : CelleuxColors.chromeBorder,
+                            lineWidth: 1
+                        )
+                        .frame(width: 48, height: 48)
+
+                    if isEnabled {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(CelleuxColors.warmGold)
+                            .symbolEffect(.bounce, value: isEnabled)
+                    } else {
+                        Image(systemName: icon)
+                            .font(.system(size: 20, weight: .light))
+                            .foregroundStyle(CelleuxColors.silver)
+                    }
+                }
+                .shadow(color: isEnabled ? CelleuxColors.goldGlow.opacity(0.3) : .black.opacity(0.04), radius: 8, x: 0, y: 4)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(CelleuxColors.textPrimary)
 
                     Text(description)

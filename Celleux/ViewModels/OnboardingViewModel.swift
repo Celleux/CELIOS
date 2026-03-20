@@ -27,9 +27,14 @@ final class OnboardingViewModel {
     let concerns = ["Fine lines", "Dullness", "Uneven tone", "Dryness", "Texture", "Dark circles"]
     let genders = ["Female", "Male", "Prefer not to say"]
 
+    var progressFraction: CGFloat {
+        let all = OnboardingPage.allCases
+        guard let idx = all.firstIndex(of: currentPage) else { return 0 }
+        return CGFloat(idx + 1) / CGFloat(all.count)
+    }
+
     func nextPage() {
         guard let next = currentPage.next else {
-            completeOnboarding()
             return
         }
         currentPage = next
@@ -116,6 +121,7 @@ nonisolated enum OnboardingPage: Int, CaseIterable, Sendable {
     case smartTiming
     case personalization
     case permissions
+    case completion
 
     var next: OnboardingPage? {
         let all = OnboardingPage.allCases
@@ -132,18 +138,30 @@ nonisolated enum OnboardingPage: Int, CaseIterable, Sendable {
 
     var showSkip: Bool {
         switch self {
-        case .welcome, .skinTracking, .longevityScore, .smartTiming, .permissions: true
-        case .personalization: false
-        }
-    }
-
-    var showDots: Bool {
-        switch self {
-        case .welcome, .skinTracking, .longevityScore, .smartTiming: true
+        case .skinTracking, .longevityScore, .smartTiming, .permissions: true
         default: false
         }
     }
 
-    var dotIndex: Int { rawValue }
-    static let dotCount = 4
+    var showProgress: Bool {
+        self != .welcome && self != .completion
+    }
+
+    var showDots: Bool {
+        switch self {
+        case .skinTracking, .longevityScore, .smartTiming: true
+        default: false
+        }
+    }
+
+    var dotIndex: Int {
+        switch self {
+        case .skinTracking: 0
+        case .longevityScore: 1
+        case .smartTiming: 2
+        default: 0
+        }
+    }
+
+    static let dotCount = 3
 }

@@ -1,5 +1,7 @@
 import SwiftUI
 
+// MARK: - Page 1: Real Skin Analysis
+
 struct ValuePropSkinTrackingView: View {
     @State private var appeared: Bool = false
     @State private var gridPulse: Bool = false
@@ -23,8 +25,7 @@ struct ValuePropSkinTrackingView: View {
                         RoundedRectangle(cornerRadius: 28)
                             .stroke(CelleuxColors.goldChromeBorder, lineWidth: 1.5)
                     )
-                    .shadow(color: CelleuxColors.goldGlow.opacity(0.15), radius: 20, x: 0, y: 10)
-                    .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 4)
+                    .celleuxDepthShadow()
 
                 scanGridOverlay
                     .clipShape(RoundedRectangle(cornerRadius: 28))
@@ -80,40 +81,43 @@ struct ValuePropSkinTrackingView: View {
                         }
                     }
 
-                    Text("150+ markers")
-                        .font(.system(size: 11, weight: .bold))
+                    Text("10 METRICS")
+                        .font(CelleuxType.label)
                         .foregroundStyle(CelleuxColors.warmGold.opacity(0.7))
                         .textCase(.uppercase)
-                        .tracking(1.5)
+                        .tracking(CelleuxType.labelTracking)
                 }
             }
-            .padding(.horizontal, 32)
-            .staggeredAppear(appeared: appeared, delay: 0)
+            .padding(.horizontal, CelleuxSpacing.xl)
+            .scaleEffect(appeared ? 1.0 : 0.8)
+            .opacity(appeared ? 1 : 0)
 
             Spacer()
-                .frame(height: 48)
+                .frame(height: CelleuxSpacing.xxl)
 
             VStack(spacing: 14) {
-                Text("See your skin transform")
-                    .font(.system(size: 28, weight: .bold))
+                Text("Real Skin Analysis")
+                    .font(.system(size: 28, weight: .light))
+                    .tracking(0.5)
                     .foregroundStyle(CelleuxColors.textPrimary)
                     .multilineTextAlignment(.center)
 
-                Text("AI-powered skin analysis tracks 150+ appearance markers over time. Watch your progress unfold week by week.")
-                    .font(.system(size: 15, weight: .regular))
-                    .foregroundStyle(.primary.opacity(0.75))
+                Text("10 metrics. Zero guesswork.\nPowered by ARKit + Computer Vision.")
+                    .font(CelleuxType.body)
+                    .foregroundStyle(CelleuxColors.textSecondary)
                     .multilineTextAlignment(.center)
-                    .lineSpacing(4)
-                    .padding(.horizontal, 8)
+                    .lineSpacing(CelleuxType.bodyLineSpacing)
+                    .padding(.horizontal, CelleuxSpacing.sm)
             }
-            .staggeredAppear(appeared: appeared, delay: 0.15)
-            .padding(.horizontal, 32)
+            .opacity(appeared ? 1 : 0)
+            .offset(y: appeared ? 0 : 20)
+            .padding(.horizontal, CelleuxSpacing.xl)
 
             Spacer()
             Spacer()
         }
         .onAppear {
-            withAnimation(.spring(response: 0.8, dampingFraction: 0.75)) {
+            withAnimation(CelleuxSpring.luxury) {
                 appeared = true
             }
             withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true)) {
@@ -148,11 +152,22 @@ struct ValuePropSkinTrackingView: View {
     }
 }
 
+// MARK: - Page 2: Your Body's Story
+
 struct ValuePropLongevityScoreView: View {
     @State private var appeared: Bool = false
     @State private var ringProgress: CGFloat = 0
     @State private var scoreValue: Int = 0
     @State private var glowPhase: Bool = false
+
+    private let healthIcons: [(icon: String, angle: Double)] = [
+        ("heart.fill", 30),
+        ("bed.double.fill", 90),
+        ("waveform.path.ecg", 150),
+        ("drop.fill", 210),
+        ("figure.walk", 270),
+        ("moon.fill", 330)
+    ]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -212,8 +227,8 @@ struct ValuePropLongevityScoreView: View {
 
                 VStack(spacing: 4) {
                     Text("\(scoreValue)")
-                        .font(.system(size: 56, weight: .ultraLight, design: .rounded))
-                        .tracking(2)
+                        .font(CelleuxType.metric)
+                        .tracking(CelleuxType.metricTracking)
                         .foregroundStyle(
                             LinearGradient(
                                 colors: [CelleuxP3.coolSilver, CelleuxColors.warmGold],
@@ -221,48 +236,54 @@ struct ValuePropLongevityScoreView: View {
                                 endPoint: .trailing
                             )
                         )
-                        .contentTransition(.numericText(countsDown: false))
+                        .animatedNumber()
 
                     Text("LONGEVITY")
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.secondary.opacity(0.5))
-                        .tracking(2.5)
+                        .font(CelleuxType.label)
+                        .foregroundStyle(CelleuxColors.textLabel)
+                        .tracking(CelleuxType.labelTracking)
                 }
 
-                ForEach(0..<8, id: \.self) { i in
-                    Circle()
-                        .fill(CelleuxColors.warmGold.opacity(0.15))
-                        .frame(width: 4, height: 4)
-                        .offset(y: -115)
-                        .rotationEffect(.degrees(Double(i) * 45))
+                ForEach(Array(healthIcons.enumerated()), id: \.offset) { idx, item in
+                    Image(systemName: item.icon)
+                        .font(.system(size: 12, weight: .light))
+                        .foregroundStyle(CelleuxColors.warmGold.opacity(0.4))
+                        .offset(y: -128)
+                        .rotationEffect(.degrees(item.angle))
+                        .opacity(appeared ? 1 : 0)
+                        .animation(CelleuxSpring.luxury.delay(0.3 + Double(idx) * 0.08), value: appeared)
                 }
             }
-            .staggeredAppear(appeared: appeared, delay: 0)
+            .scaleEffect(appeared ? 1.0 : 0.8)
+            .opacity(appeared ? 1 : 0)
 
             Spacer()
-                .frame(height: 48)
+                .frame(height: CelleuxSpacing.xxl)
 
             VStack(spacing: 14) {
-                Text("Your Skin Longevity Score")
-                    .font(.system(size: 28, weight: .bold))
+                Text("Your Body's Story")
+                    .font(.system(size: 28, weight: .light))
+                    .tracking(0.5)
                     .foregroundStyle(CelleuxColors.textPrimary)
                     .multilineTextAlignment(.center)
 
-                Text("Apple Watch data meets skin science. One daily number that captures your body's renewal capacity.")
-                    .font(.system(size: 15, weight: .regular))
-                    .foregroundStyle(.primary.opacity(0.75))
+                Text("Sleep, HRV, stress, hydration \u{2014}\nall connected to your skin.")
+                    .font(CelleuxType.body)
+                    .foregroundStyle(CelleuxColors.textSecondary)
                     .multilineTextAlignment(.center)
-                    .lineSpacing(4)
-                    .padding(.horizontal, 8)
+                    .lineSpacing(CelleuxType.bodyLineSpacing)
+                    .padding(.horizontal, CelleuxSpacing.sm)
             }
-            .staggeredAppear(appeared: appeared, delay: 0.15)
-            .padding(.horizontal, 32)
+            .opacity(appeared ? 1 : 0)
+            .offset(y: appeared ? 0 : 20)
+            .animation(CelleuxSpring.luxury.delay(0.15), value: appeared)
+            .padding(.horizontal, CelleuxSpacing.xl)
 
             Spacer()
             Spacer()
         }
         .onAppear {
-            withAnimation(.spring(response: 0.8, dampingFraction: 0.75)) {
+            withAnimation(CelleuxSpring.luxury) {
                 appeared = true
             }
             withAnimation(.easeOut(duration: 2.0).delay(0.3)) {
@@ -294,9 +315,11 @@ struct ValuePropLongevityScoreView: View {
     }
 }
 
+// MARK: - Page 3: Intelligent Timing
+
 struct ValuePropSmartTimingView: View {
     @State private var appeared: Bool = false
-    @State private var activeDose: Int = 0
+    @State private var activeDose: Int = -1
 
     private let doses: [(time: String, label: String, icon: String)] = [
         ("7:00 AM", "Morning Dose", "sunrise.fill"),
@@ -310,7 +333,7 @@ struct ValuePropSmartTimingView: View {
 
             VStack(spacing: 0) {
                 ForEach(Array(doses.enumerated()), id: \.offset) { idx, dose in
-                    HStack(spacing: 16) {
+                    HStack(spacing: CelleuxSpacing.md) {
                         VStack {
                             ZStack {
                                 Circle()
@@ -349,16 +372,17 @@ struct ValuePropSmartTimingView: View {
 
                         VStack(alignment: .leading, spacing: 4) {
                             Text(dose.time)
-                                .font(.system(size: 13, weight: .medium))
+                                .font(CelleuxType.caption)
+                                .tracking(CelleuxType.captionTracking)
                                 .foregroundStyle(idx <= activeDose ? CelleuxColors.warmGold : CelleuxColors.textLabel)
 
                             Text(dose.label)
-                                .font(.system(size: 17, weight: .semibold))
+                                .font(.system(size: 17, weight: .medium))
                                 .foregroundStyle(CelleuxColors.textPrimary)
 
                             if idx <= activeDose {
                                 Text("Optimized for your rhythm")
-                                    .font(.system(size: 12, weight: .regular))
+                                    .font(CelleuxType.caption)
                                     .foregroundStyle(CelleuxColors.textLabel)
                             }
                         }
@@ -376,7 +400,7 @@ struct ValuePropSmartTimingView: View {
                     .padding(.vertical, 4)
                 }
             }
-            .padding(24)
+            .padding(CelleuxSpacing.lg)
             .background(
                 ZStack {
                     RoundedRectangle(cornerRadius: 24)
@@ -409,35 +433,38 @@ struct ValuePropSmartTimingView: View {
                         .padding(1.5)
                 }
             )
-            .shadow(color: CelleuxColors.goldGlow.opacity(0.1), radius: 20, x: 0, y: 10)
-            .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 4)
-            .padding(.horizontal, 32)
-            .staggeredAppear(appeared: appeared, delay: 0)
+            .celleuxDepthShadow()
+            .padding(.horizontal, CelleuxSpacing.xl)
+            .scaleEffect(appeared ? 1.0 : 0.8)
+            .opacity(appeared ? 1 : 0)
 
             Spacer()
-                .frame(height: 48)
+                .frame(height: CelleuxSpacing.xxl)
 
             VStack(spacing: 14) {
-                Text("Precision timing, not just daily doses")
-                    .font(.system(size: 28, weight: .bold))
+                Text("Intelligent Timing")
+                    .font(.system(size: 28, weight: .light))
+                    .tracking(0.5)
                     .foregroundStyle(CelleuxColors.textPrimary)
                     .multilineTextAlignment(.center)
 
-                Text("Your circadian rhythm is unique. We optimize exactly when to take AeonDerm for maximum absorption.")
-                    .font(.system(size: 15, weight: .regular))
-                    .foregroundStyle(.primary.opacity(0.75))
+                Text("Your supplements, timed to\nyour circadian rhythm.")
+                    .font(CelleuxType.body)
+                    .foregroundStyle(CelleuxColors.textSecondary)
                     .multilineTextAlignment(.center)
-                    .lineSpacing(4)
-                    .padding(.horizontal, 8)
+                    .lineSpacing(CelleuxType.bodyLineSpacing)
+                    .padding(.horizontal, CelleuxSpacing.sm)
             }
-            .staggeredAppear(appeared: appeared, delay: 0.15)
-            .padding(.horizontal, 32)
+            .opacity(appeared ? 1 : 0)
+            .offset(y: appeared ? 0 : 20)
+            .animation(CelleuxSpring.luxury.delay(0.15), value: appeared)
+            .padding(.horizontal, CelleuxSpacing.xl)
 
             Spacer()
             Spacer()
         }
         .onAppear {
-            withAnimation(.spring(response: 0.8, dampingFraction: 0.75)) {
+            withAnimation(CelleuxSpring.luxury) {
                 appeared = true
             }
             animateDoses()
@@ -447,11 +474,15 @@ struct ValuePropSmartTimingView: View {
     private func animateDoses() {
         Task {
             try? await Task.sleep(for: .milliseconds(600))
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+            withAnimation(CelleuxSpring.snappy) {
+                activeDose = 0
+            }
+            try? await Task.sleep(for: .milliseconds(800))
+            withAnimation(CelleuxSpring.snappy) {
                 activeDose = 1
             }
             try? await Task.sleep(for: .milliseconds(800))
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+            withAnimation(CelleuxSpring.snappy) {
                 activeDose = 2
             }
         }

@@ -3,7 +3,7 @@ import SwiftUI
 struct OnboardingView: View {
     @Environment(\.completeOnboarding) private var completeOnboarding
     @State private var viewModel = OnboardingViewModel()
-    @State private var transitionDirection: Edge = .trailing
+    @Namespace private var dotNamespace
 
     var body: some View {
         ZStack {
@@ -11,36 +11,36 @@ struct OnboardingView: View {
 
             currentPageView
                 .id(viewModel.currentPage)
-                .transition(.asymmetric(
-                    insertion: .move(edge: transitionDirection).combined(with: .opacity),
-                    removal: .move(edge: transitionDirection == .trailing ? .leading : .trailing).combined(with: .opacity)
-                ))
+                .transition(.blurReplace)
 
-            if viewModel.currentPage.showDots {
-                VStack {
-                    Spacer()
-                    pageIndicator
-                        .padding(.bottom, 120)
+            VStack {
+                if viewModel.currentPage.showProgress {
+                    progressBar
+                        .padding(.top, 8)
                 }
-            }
 
-            if viewModel.currentPage.showSkip && viewModel.currentPage != .welcome {
-                VStack {
+                if viewModel.currentPage.showSkip {
                     HStack {
                         Spacer()
                         Button {
                             navigateForward()
                         } label: {
                             Text("Skip")
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundStyle(CelleuxColors.textLabel)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
+                                .font(CelleuxType.caption)
+                                .tracking(CelleuxType.captionTracking)
+                                .foregroundStyle(CelleuxColors.silver)
+                                .padding(.horizontal, CelleuxSpacing.md)
+                                .padding(.vertical, CelleuxSpacing.sm)
                         }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    Spacer()
+                    .padding(.horizontal, CelleuxSpacing.md)
+                }
+
+                Spacer()
+
+                if viewModel.currentPage.showDots {
+                    pageIndicator
+                        .padding(.bottom, 120)
                 }
             }
 
@@ -51,25 +51,24 @@ struct OnboardingView: View {
                         navigateForward()
                     } label: {
                         Text("Continue")
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.system(size: 16, weight: .medium))
                             .tracking(0.3)
                             .foregroundStyle(CelleuxColors.textPrimary)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 18)
                     }
                     .buttonStyle(GlassButtonStyle())
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, CelleuxSpacing.lg)
                     .padding(.bottom, 40)
                 }
             }
         }
-        .animation(.spring(response: 0.5, dampingFraction: 0.85), value: viewModel.currentPage)
+        .animation(CelleuxSpring.luxury, value: viewModel.currentPage)
         .fullScreenCover(isPresented: $viewModel.showQRScanner) {
             QRScanView(
                 isPresented: $viewModel.showQRScanner,
                 scanSuccess: $viewModel.qrScanSuccess,
                 onSuccess: {
-                    transitionDirection = .trailing
                     viewModel.goToPersonalization()
                 }
             )
@@ -82,7 +81,7 @@ struct OnboardingView: View {
         case .welcome:
             WelcomeView(
                 showQRScanner: $viewModel.showQRScanner,
-                onLearnMore: {
+                onBegin: {
                     navigateForward()
                 }
             )
@@ -98,30 +97,51 @@ struct OnboardingView: View {
             }
         case .permissions:
             PermissionsView(viewModel: viewModel) {
+                navigateForward()
+            }
+        case .completion:
+            CompletionView {
                 completeOnboarding()
             }
         }
     }
 
     private func navigateForward() {
-        transitionDirection = .trailing
         viewModel.nextPage()
     }
 
-    private var pageIndicator: some View {
-        HStack(spacing: 8) {
-            ForEach(0..<OnboardingPage.dotCount, id: \.self) { index in
-                Capsule()
+    private var progressBar: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(CelleuxColors.silver.opacity(0.12))
+                    .frame(height: 2)
+
+                RoundedRectangle(cornerRadius: 1)
                     .fill(
-                        index == viewModel.currentPage.dotIndex
-                            ? CelleuxColors.warmGold
-                            : CelleuxColors.silver.opacity(0.25)
+                        LinearGradient(
+                            colors: [CelleuxColors.warmGold.opacity(0.6), CelleuxColors.champagneGold.opacity(0.8)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
                     )
-                    .frame(
-                        width: index == viewModel.currentPage.dotIndex ? 24 : 8,
-                        height: 8
-                    )
-                    .animation(.spring(response: 0.4, dampingFraction: 0.7), value: viewModel.currentPage)
+                    .frame(width: geo.size.width * viewModel.progressFraction, height: 2)
+                    .animation(CelleuxSpring.luxury, value: viewModel.progressFraction)
+            }
+        }
+        .frame(height: 2)
+        .padding(.horizontal, CelleuxSpacing.lg)
+    }
+
+    private var pageIndicator: some View {
+        HStack(spacing: CelleuxSpacing.sm) {
+            ForEach(0..<OnboardingPage.dotCount, id: \.self) { index in
+                let isActive = index == viewModel.currentPage.dotIndex
+
+                Capsule()
+                    .fill(isActive ? CelleuxColors.warmGold : CelleuxColors.silver.opacity(0.25))
+                    .frame(width: isActive ? 24 : 8, height: 8)
+                    .animation(CelleuxSpring.snappy, value: viewModel.currentPage)
             }
         }
     }
