@@ -47,6 +47,7 @@ struct ScanView: View {
                         ZStack {
                             ScanResultsView(
                                 result: result,
+                                history: viewModel.scanHistory,
                                 onNewScan: {
                                     withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
                                         viewModel.resetScan()
@@ -207,7 +208,7 @@ struct ScanView: View {
     }
 
     private var isDarkPhase: Bool {
-        viewModel.phase == .scanning || viewModel.phase == .analyzing || viewModel.phase == .heatMap || viewModel.phase == .progress
+        viewModel.phase == .scanning || viewModel.phase == .analyzing || viewModel.phase == .heatMap
     }
 
     private var navigationTitle: String {

@@ -22,13 +22,18 @@ struct ProgressComparisonView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            headerBar
-            timeframePicker
-            splitScreenContent
-            metricsDelta
+        ScrollView {
+            VStack(spacing: 24) {
+                headerBar
+                timeframePicker
+                overallDelta
+                metricComparisonList
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 40)
         }
-        .background(Color(hex: "0A0A10").ignoresSafeArea())
+        .background(CelleuxMeshBackground())
         .onAppear {
             withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
                 appeared = true
@@ -47,22 +52,20 @@ struct ProgressComparisonView: View {
                     Text("Back")
                         .font(.system(size: 15, weight: .medium))
                 }
-                .foregroundStyle(Color(hex: "00F2D8"))
+                .foregroundStyle(CelleuxColors.warmGold)
             }
 
             Spacer()
 
             Text("PROGRESS")
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.7))
-                .tracking(2)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(CelleuxColors.textLabel)
+                .tracking(1.8)
 
             Spacer()
 
             Color.clear.frame(width: 60)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
     }
 
     private var timeframePicker: some View {
@@ -70,179 +73,180 @@ struct ProgressComparisonView: View {
             ForEach(ProgressTimeframe.allCases, id: \.rawValue) { timeframe in
                 let isSelected = selectedTimeframe == timeframe
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    withAnimation(CelleuxSpring.snappy) {
                         selectedTimeframe = timeframe
                     }
                 } label: {
                     Text(timeframe.rawValue)
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(isSelected ? Color(hex: "00F2D8") : .white.opacity(0.4))
+                        .foregroundStyle(isSelected ? CelleuxColors.warmGold : CelleuxColors.textLabel)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
                         .background(
                             Capsule()
-                                .fill(isSelected ? Color(hex: "00F2D8").opacity(0.12) : Color.white.opacity(0.05))
+                                .fill(isSelected ? CelleuxColors.warmGold.opacity(0.1) : Color.clear)
                         )
                         .overlay(
                             Capsule()
-                                .stroke(isSelected ? Color(hex: "00F2D8").opacity(0.4) : Color.clear, lineWidth: 0.5)
+                                .stroke(isSelected ? CelleuxColors.warmGold.opacity(0.3) : Color.clear, lineWidth: 0.5)
                         )
                 }
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 12)
+        .sensoryFeedback(.selection, trigger: selectedTimeframe)
     }
 
-    private var splitScreenContent: some View {
-        HStack(spacing: 2) {
-            progressPanel(
-                title: "THEN",
-                subtitle: comparisonResult?.shortDateString ?? "No data",
-                score: comparisonResult?.overallScore ?? 0,
-                isPast: true
-            )
+    private var overallDelta: some View {
+        GlassCard(depth: .elevated) {
+            HStack {
+                VStack(spacing: 6) {
+                    Text("THEN")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundStyle(CelleuxColors.textLabel)
+                        .tracking(1)
 
-            Rectangle()
-                .fill(Color(hex: "00F2D8").opacity(0.3))
-                .frame(width: 1)
+                    Text(comparisonResult?.shortDateString ?? "—")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(CelleuxColors.textLabel)
 
-            progressPanel(
-                title: "NOW",
-                subtitle: currentResult?.shortDateString ?? "Today",
-                score: currentResult?.overallScore ?? 0,
-                isPast: false
-            )
-        }
-        .frame(height: 280)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color(hex: "00F2D8").opacity(0.15), lineWidth: 0.5)
-        )
-        .padding(.horizontal, 16)
-        .opacity(appeared ? 1 : 0)
-        .offset(y: appeared ? 0 : 20)
-    }
-
-    private func progressPanel(title: String, subtitle: String, score: Int, isPast: Bool) -> some View {
-        ZStack {
-            LinearGradient(
-                colors: [Color(hex: "0F1018"), Color(hex: "0A0A10")],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-
-            VStack(spacing: 16) {
-                VStack(spacing: 4) {
-                    Text(title)
-                        .font(.system(size: 10, weight: .bold, design: .monospaced))
-                        .foregroundStyle(isPast ? .white.opacity(0.4) : Color(hex: "00F2D8"))
-                        .tracking(2)
-                    Text(subtitle)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.3))
+                    Text("\(comparisonResult?.overallScore ?? 0)")
+                        .font(.system(size: 38, weight: .ultraLight))
+                        .foregroundStyle(CelleuxColors.textSecondary)
+                        .contentTransition(.numericText())
                 }
 
-                ZStack {
-                    Circle()
-                        .stroke(Color.white.opacity(0.06), lineWidth: 6)
-                        .frame(width: 100, height: 100)
+                Spacer()
 
-                    Circle()
-                        .trim(from: 0, to: appeared ? Double(score) / 100.0 : 0)
-                        .stroke(
-                            LinearGradient(
-                                colors: isPast ? [Color.white.opacity(0.3), Color.white.opacity(0.15)] : [Color(hex: "00F2D8"), Color(hex: "8B5CF6")],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            style: StrokeStyle(lineWidth: 6, lineCap: .round)
-                        )
-                        .frame(width: 100, height: 100)
-                        .rotationEffect(.degrees(-90))
-                        .animation(.easeOut(duration: 1.2).delay(0.3), value: appeared)
-
-                    VStack(spacing: 2) {
-                        Text("\(score)")
-                            .font(.system(size: 32, weight: .ultraLight))
-                            .foregroundStyle(isPast ? .white.opacity(0.5) : .white)
-                        Text("SCORE")
-                            .font(.system(size: 8, weight: .bold, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.3))
-                            .tracking(1)
-                    }
-                }
-
-                if !isPast, let current = currentResult?.overallScore, let past = comparisonResult?.overallScore {
+                if let current = currentResult?.overallScore, let past = comparisonResult?.overallScore {
                     let delta = current - past
-                    HStack(spacing: 4) {
-                        Image(systemName: delta >= 0 ? "arrow.up.right" : "arrow.down.right")
-                            .font(.system(size: 10, weight: .bold))
+                    VStack(spacing: 4) {
+                        Image(systemName: delta >= 0 ? "arrow.up.right.circle.fill" : "arrow.down.right.circle.fill")
+                            .font(.system(size: 28, weight: .light))
+                            .foregroundStyle(delta >= 0 ? Color(hex: "4CAF50") : Color(hex: "E53935"))
+
                         Text(String(format: "%+d", delta))
-                            .font(.system(size: 13, weight: .bold, design: .monospaced))
+                            .font(.system(size: 18, weight: .bold, design: .monospaced))
+                            .foregroundStyle(delta >= 0 ? Color(hex: "4CAF50") : Color(hex: "E53935"))
+                            .contentTransition(.numericText())
                     }
-                    .foregroundStyle(delta >= 0 ? Color(hex: "4CAF50") : Color(hex: "FF4D6A"))
+                }
+
+                Spacer()
+
+                VStack(spacing: 6) {
+                    Text("NOW")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundStyle(CelleuxColors.warmGold)
+                        .tracking(1)
+
+                    Text(currentResult?.shortDateString ?? "Today")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(CelleuxColors.textLabel)
+
+                    Text("\(currentResult?.overallScore ?? 0)")
+                        .font(.system(size: 38, weight: .ultraLight))
+                        .foregroundStyle(CelleuxColors.textPrimary)
+                        .contentTransition(.numericText())
                 }
             }
         }
+        .staggeredAppear(appeared: appeared, delay: 0)
     }
 
-    private var metricsDelta: some View {
-        VStack(spacing: 10) {
+    private var metricComparisonList: some View {
+        VStack(alignment: .leading, spacing: 14) {
             Text("METRIC CHANGES")
-                .font(.system(size: 9, weight: .bold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.4))
-                .tracking(2)
-                .padding(.top, 16)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(CelleuxColors.textLabel)
+                .tracking(1.8)
 
-            if let current = currentResult?.analysisData, let past = comparisonResult?.analysisData {
-                HStack(spacing: 0) {
-                    deltaMetric(label: "Texture", current: current.textureScore, past: past.textureScore, color: Color(hex: "FF9500"))
-                    Spacer()
-                    deltaMetric(label: "Hydration", current: current.hydrationScore, past: past.hydrationScore, color: Color(hex: "00B4D8"))
-                    Spacer()
-                    deltaMetric(label: "Brightness", current: current.brightnessScore, past: past.brightnessScore, color: Color(hex: "8B5CF6"))
-                    Spacer()
-                    deltaMetric(label: "Redness", current: current.rednessScore, past: past.rednessScore, color: Color(hex: "FF4D6A"))
+            if let currentData = currentResult?.analysisData, let pastData = comparisonResult?.analysisData {
+                let metrics = SkinMetricType.allCases.filter { $0 != .overallSkinHealth && $0.isImplemented }
+                ForEach(Array(metrics.enumerated()), id: \.element.rawValue) { index, metric in
+                    let current = currentData.score(for: metric)
+                    let past = pastData.score(for: metric)
+                    let delta = current - past
+                    let improved = delta >= 0
+
+                    CompactGlassCard {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Image(systemName: metric.icon)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(CelleuxColors.warmGold)
+
+                                Text(metric.rawValue)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(CelleuxColors.textPrimary)
+
+                                Spacer()
+
+                                HStack(spacing: 3) {
+                                    Image(systemName: improved ? "arrow.up.right" : "arrow.down.right")
+                                        .font(.system(size: 9, weight: .bold))
+                                    Text(String(format: "%+.0f", delta))
+                                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                        .contentTransition(.numericText())
+                                }
+                                .foregroundStyle(improved ? Color(hex: "4CAF50") : Color(hex: "E8A838"))
+                            }
+
+                            HStack(spacing: 8) {
+                                progressComparisonBar(score: past, label: "Before", isActive: false)
+                                progressComparisonBar(score: current, label: "Now", isActive: true)
+                            }
+                        }
+                    }
+                    .staggeredAppear(appeared: appeared, delay: 0.08 + Double(index) * 0.04)
                 }
-                .padding(.horizontal, 20)
             } else {
-                Text("Complete more scans to see progress")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.3))
-                    .padding(.vertical, 20)
+                GlassCard {
+                    VStack(spacing: 12) {
+                        ChromeIconBadge("chart.bar.xaxis", size: 48)
+                        Text("Complete more scans to see progress comparisons")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(CelleuxColors.textLabel)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .staggeredAppear(appeared: appeared, delay: 0.1)
             }
         }
-        .padding(.bottom, 20)
-        .staggeredAppear(appeared: appeared, delay: 0.2)
     }
 
-    private func deltaMetric(label: String, current: Double, past: Double, color: Color) -> some View {
-        let delta = current - past
-        return VStack(spacing: 4) {
-            HStack(spacing: 2) {
-                Image(systemName: delta >= 0 ? "arrow.up" : "arrow.down")
-                    .font(.system(size: 8, weight: .bold))
-                Text(String(format: "%+.0f", delta))
-                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
+    private func progressComparisonBar(score: Double, label: String, isActive: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack {
+                Text(label)
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(isActive ? CelleuxColors.textSecondary : CelleuxColors.textLabel)
+
+                Spacer()
+
+                Text("\(Int(score.rounded()))")
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(isActive ? CelleuxColors.textPrimary : CelleuxColors.textLabel)
+                    .contentTransition(.numericText())
             }
-            .foregroundStyle(delta >= 0 ? Color(hex: "4CAF50") : Color(hex: "FF4D6A"))
 
-            Text(label)
-                .font(.system(size: 8, weight: .bold))
-                .foregroundStyle(.white.opacity(0.35))
-                .textCase(.uppercase)
-                .tracking(0.5)
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(CelleuxColors.silver.opacity(0.06))
+                        .frame(height: 4)
 
-            RoundedRectangle(cornerRadius: 2)
-                .fill(color.opacity(0.3))
-                .frame(width: 40, height: 3)
-                .overlay(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(color)
-                        .frame(width: max(0, min(40, 40 * current / 100)), height: 3)
+                    Capsule()
+                        .fill(
+                            isActive
+                                ? LinearGradient(colors: [CelleuxColors.warmGold.opacity(0.8), CelleuxColors.warmGold], startPoint: .leading, endPoint: .trailing)
+                                : LinearGradient(colors: [CelleuxColors.silver.opacity(0.3), CelleuxColors.silver.opacity(0.2)], startPoint: .leading, endPoint: .trailing)
+                        )
+                        .frame(width: appeared ? geo.size.width * CGFloat(score) / 100.0 : 0, height: 4)
+                        .animation(.spring(response: 0.8, dampingFraction: 0.7), value: appeared)
                 }
+            }
+            .frame(height: 4)
         }
     }
 }

@@ -1,4 +1,5 @@
 import SwiftUI
+import Charts
 
 struct ScanHistoryView: View {
     let history: [SkinScanResult]
@@ -7,10 +8,37 @@ struct ScanHistoryView: View {
 
     @State private var appeared: Bool = false
     @State private var chartAnimated: Bool = false
+    @State private var selectedTimeRange: HistoryTimeRange = .all
+    @State private var selectedDataPoint: SkinScanResult? = nil
+
+    private var filteredHistory: [SkinScanResult] {
+        let now = Date()
+        let calendar = Calendar.current
+        return history.filter { scan in
+            switch selectedTimeRange {
+            case .sevenDays:
+                guard let cutoff = calendar.date(byAdding: .day, value: -7, to: now) else { return true }
+                return scan.date >= cutoff
+            case .thirtyDays:
+                guard let cutoff = calendar.date(byAdding: .day, value: -30, to: now) else { return true }
+                return scan.date >= cutoff
+            case .ninetyDays:
+                guard let cutoff = calendar.date(byAdding: .day, value: -90, to: now) else { return true }
+                return scan.date >= cutoff
+            case .all:
+                return true
+            }
+        }
+    }
+
+    private var sortedFiltered: [SkinScanResult] {
+        filteredHistory.sorted { $0.date < $1.date }
+    }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
+                timeRangeSelector
                 progressChart
                 scanTimeline
             }
@@ -29,6 +57,40 @@ struct ScanHistoryView: View {
         }
     }
 
+    // MARK: - Time Range Selector
+
+    private var timeRangeSelector: some View {
+        HStack(spacing: 6) {
+            ForEach(HistoryTimeRange.allCases, id: \.rawValue) { range in
+                let isSelected = selectedTimeRange == range
+                Button {
+                    withAnimation(CelleuxSpring.snappy) {
+                        selectedTimeRange = range
+                        selectedDataPoint = nil
+                    }
+                } label: {
+                    Text(range.rawValue)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(isSelected ? CelleuxColors.warmGold : CelleuxColors.textLabel)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule()
+                                .fill(isSelected ? CelleuxColors.warmGold.opacity(0.1) : Color.clear)
+                        )
+                        .overlay(
+                            Capsule()
+                                .stroke(isSelected ? CelleuxColors.warmGold.opacity(0.3) : Color.clear, lineWidth: 0.5)
+                        )
+                }
+            }
+        }
+        .sensoryFeedback(.selection, trigger: selectedTimeRange)
+        .staggeredAppear(appeared: appeared, delay: 0)
+    }
+
+    // MARK: - Progress Chart
+
     private var progressChart: some View {
         GlassCard(depth: .elevated) {
             VStack(alignment: .leading, spacing: 16) {
@@ -38,13 +100,13 @@ struct ScanHistoryView: View {
                         .foregroundStyle(CelleuxColors.textLabel)
                         .tracking(1.8)
                     Spacer()
-                    Text("\(history.count) scans")
+                    Text("\(filteredHistory.count) scans")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(CelleuxColors.textLabel)
                 }
 
-                if history.count >= 2 {
-                    historyChart
+                if sortedFiltered.count >= 2 {
+                    areaChart
                 } else {
                     VStack(spacing: 12) {
                         ChromeIconBadge("chart.line.uptrend.xyaxis", size: 48)
@@ -55,88 +117,148 @@ struct ScanHistoryView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 24)
                 }
+
+                if let selected = selectedDataPoint {
+                    selectedScanInfo(selected)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                }
             }
         }
-        .staggeredAppear(appeared: appeared, delay: 0)
+        .staggeredAppear(appeared: appeared, delay: 0.06)
     }
 
-    private var historyChart: some View {
-        let sortedHistory = history.sorted { $0.date < $1.date }
-        let scores = sortedHistory.map { Double($0.overallScore) }
-        let minScore = (scores.min() ?? 60) - 5
-        let maxScore = (scores.max() ?? 90) + 5
-        let range = maxScore - minScore
+    private var areaChart: some View {
+        let data = sortedFiltered
+        let scores = data.map { Double($0.overallScore) }
+        let minY = max(0, (scores.min() ?? 60) - 10)
+        let maxY = min(100, (scores.max() ?? 90) + 10)
 
-        return GeometryReader { geo in
-            let width = geo.size.width
-            let height: CGFloat = 120
-            let stepX = scores.count > 1 ? width / CGFloat(scores.count - 1) : width
-
-            ZStack(alignment: .bottomLeading) {
-                ForEach(0..<4, id: \.self) { i in
-                    let y = height * CGFloat(i) / 3.0
-                    Path { path in
-                        path.move(to: CGPoint(x: 0, y: y))
-                        path.addLine(to: CGPoint(x: width, y: y))
-                    }
-                    .stroke(CelleuxColors.silver.opacity(0.08), style: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
-                }
-
-                Path { path in
-                    for (index, score) in scores.enumerated() {
-                        let x = stepX * CGFloat(index)
-                        let y = height - ((score - minScore) / range * height)
-                        if index == 0 {
-                            path.move(to: CGPoint(x: x, y: y))
-                        } else {
-                            let prev = scores[index - 1]
-                            let prevX = stepX * CGFloat(index - 1)
-                            let prevY = height - ((prev - minScore) / range * height)
-                            let cx1 = prevX + stepX * 0.4
-                            let cx2 = x - stepX * 0.4
-                            path.addCurve(
-                                to: CGPoint(x: x, y: y),
-                                control1: CGPoint(x: cx1, y: prevY),
-                                control2: CGPoint(x: cx2, y: y)
-                            )
-                        }
-                    }
-                }
-                .trim(from: 0, to: chartAnimated ? 1 : 0)
-                .stroke(
-                    LinearGradient(colors: [CelleuxP3.coolSilver, CelleuxColors.warmGold], startPoint: .leading, endPoint: .trailing),
-                    style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round)
+        return Chart(Array(data.enumerated()), id: \.element.id) { index, scan in
+            LineMark(
+                x: .value("Date", scan.date),
+                y: .value("Score", chartAnimated ? Double(scan.overallScore) : minY)
+            )
+            .interpolationMethod(.catmullRom)
+            .foregroundStyle(
+                LinearGradient(
+                    colors: [CelleuxP3.coolSilver, CelleuxColors.warmGold],
+                    startPoint: .leading,
+                    endPoint: .trailing
                 )
-                .shadow(color: CelleuxColors.warmGold.opacity(0.3), radius: 8, x: 0, y: 2)
+            )
+            .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
 
-                ForEach(Array(scores.enumerated()), id: \.offset) { index, score in
-                    let x = stepX * CGFloat(index)
-                    let y = height - ((score - minScore) / range * height)
+            AreaMark(
+                x: .value("Date", scan.date),
+                y: .value("Score", chartAnimated ? Double(scan.overallScore) : minY)
+            )
+            .interpolationMethod(.catmullRom)
+            .foregroundStyle(
+                LinearGradient(
+                    colors: [
+                        CelleuxColors.warmGold.opacity(0.2),
+                        CelleuxColors.warmGold.opacity(0.05),
+                        CelleuxColors.warmGold.opacity(0.0)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
 
+            if let selected = selectedDataPoint, selected.id == scan.id {
+                PointMark(
+                    x: .value("Date", scan.date),
+                    y: .value("Score", Double(scan.overallScore))
+                )
+                .symbol {
                     ZStack {
                         Circle()
                             .fill(Color.white)
-                            .frame(width: 10, height: 10)
-                            .shadow(color: CelleuxColors.warmGold.opacity(0.3), radius: 4, x: 0, y: 1)
+                            .frame(width: 12, height: 12)
+                            .shadow(color: CelleuxColors.warmGold.opacity(0.4), radius: 4, x: 0, y: 2)
                         Circle()
-                            .fill(CelleuxColors.warmGold.opacity(0.7))
-                            .frame(width: 5, height: 5)
+                            .fill(CelleuxColors.warmGold)
+                            .frame(width: 6, height: 6)
                     }
-                    .position(x: x, y: y)
-                    .opacity(chartAnimated ? 1 : 0)
-                }
-
-                ForEach(Array(sortedHistory.enumerated()), id: \.element.id) { index, scan in
-                    let x = stepX * CGFloat(index)
-                    Text(scan.shortDateString)
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(CelleuxColors.textLabel)
-                        .position(x: x, y: height + 16)
                 }
             }
         }
-        .frame(height: 145)
+        .chartXAxis {
+            AxisMarks(values: .automatic(desiredCount: 4)) { value in
+                AxisValueLabel {
+                    if let date = value.as(Date.self) {
+                        Text(date, format: .dateTime.month(.abbreviated).day())
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(CelleuxColors.textLabel)
+                    }
+                }
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
+                    .foregroundStyle(CelleuxColors.silver.opacity(0.08))
+            }
+        }
+        .chartYAxis {
+            AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { value in
+                AxisValueLabel {
+                    if let score = value.as(Int.self) {
+                        Text("\(score)")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(CelleuxColors.textLabel)
+                    }
+                }
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
+                    .foregroundStyle(CelleuxColors.silver.opacity(0.06))
+            }
+        }
+        .chartYScale(domain: minY...maxY)
+        .chartOverlay { proxy in
+            GeometryReader { geo in
+                Rectangle()
+                    .fill(Color.clear)
+                    .contentShape(Rectangle())
+                    .onTapGesture { location in
+                        guard let date: Date = proxy.value(atX: location.x) else { return }
+                        let closest = data.min(by: {
+                            abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date))
+                        })
+                        withAnimation(CelleuxSpring.snappy) {
+                            selectedDataPoint = closest
+                        }
+                    }
+            }
+        }
+        .frame(height: 180)
+        .animation(.easeOut(duration: 1.0), value: chartAnimated)
     }
+
+    private func selectedScanInfo(_ scan: SkinScanResult) -> some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(scan.dateString)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(CelleuxColors.textPrimary)
+
+                Text("Score: \(scan.overallScore)")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(CelleuxColors.warmGold)
+            }
+
+            Spacer()
+
+            Button {
+                onSelectScan(scan)
+            } label: {
+                Text("View Details")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(CelleuxColors.warmGold)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+            }
+            .buttonStyle(OutlineGlassButtonStyle())
+        }
+        .padding(.top, 4)
+    }
+
+    // MARK: - Scan Timeline
 
     private var scanTimeline: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -145,17 +267,18 @@ struct ScanHistoryView: View {
                 .foregroundStyle(CelleuxColors.textLabel)
                 .tracking(1.8)
 
-            if history.isEmpty {
+            if filteredHistory.isEmpty {
                 emptyState
             } else {
-                ForEach(Array(history.enumerated()), id: \.element.id) { index, scan in
+                let sortedDesc = filteredHistory.sorted { $0.date > $1.date }
+                ForEach(Array(sortedDesc.enumerated()), id: \.element.id) { index, scan in
                     Button {
                         onSelectScan(scan)
                     } label: {
-                        scanTimelineRow(scan: scan, isLast: index == history.count - 1)
+                        scanTimelineRow(scan: scan, isLast: index == sortedDesc.count - 1)
                     }
                     .buttonStyle(PressableButtonStyle())
-                    .sensoryFeedback(.impact(flexibility: .soft), trigger: false)
+                    .sensoryFeedback(.selection, trigger: false)
                     .staggeredAppear(appeared: appeared, delay: 0.12 + Double(index) * 0.06)
                 }
             }
@@ -196,8 +319,9 @@ struct ScanHistoryView: View {
                                 HStack(spacing: 2) {
                                     Image(systemName: scan.trend > 0 ? "arrow.up.right" : "arrow.down.right")
                                         .font(.system(size: 9, weight: .semibold))
-                                    Text(String(format: "%+.1f%%", scan.trend))
+                                    Text(String(format: "%+.0f", scan.trend))
                                         .font(.system(size: 10, weight: .semibold))
+                                        .contentTransition(.numericText())
                                 }
                                 .foregroundStyle(scan.trend > 0 ? Color(hex: "4CAF50") : Color(hex: "E53935"))
                             }
@@ -206,22 +330,7 @@ struct ScanHistoryView: View {
 
                     Spacer()
 
-                    ZStack {
-                        Circle()
-                            .stroke(CelleuxColors.silver.opacity(0.1), lineWidth: 3)
-                            .frame(width: 38, height: 38)
-
-                        Circle()
-                            .trim(from: 0, to: Double(scan.overallScore) / 100.0)
-                            .stroke(CelleuxColors.goldGradient, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                            .frame(width: 38, height: 38)
-                            .rotationEffect(.degrees(-90))
-                            .shadow(color: CelleuxColors.goldGlow.opacity(0.2), radius: 3, x: 0, y: 0)
-
-                        Text("\(scan.overallScore)")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(CelleuxColors.textPrimary)
-                    }
+                    MetricRingMini(score: scan.overallScore, size: 38)
 
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11, weight: .medium))
@@ -249,4 +358,11 @@ struct ScanHistoryView: View {
         }
         .staggeredAppear(appeared: appeared, delay: 0.12)
     }
+}
+
+nonisolated enum HistoryTimeRange: String, CaseIterable, Sendable {
+    case sevenDays = "7D"
+    case thirtyDays = "30D"
+    case ninetyDays = "90D"
+    case all = "All"
 }

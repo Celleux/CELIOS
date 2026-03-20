@@ -1,18 +1,22 @@
 import SwiftUI
+import Charts
 
 struct ScanResultsView: View {
     let result: SkinScanResult
+    let history: [SkinScanResult]
     let onNewScan: () -> Void
     let onShowHistory: () -> Void
 
     @State private var appeared: Bool = false
     @State private var scoreAnimated: Bool = false
     @State private var ringGlow: Bool = false
-    @State private var showMetrics: Bool = true
     @State private var celebrationTrigger: Int = 0
     @State private var displayedScore: Int = 0
     @State private var regionAppeared: Bool = false
     @State private var metricsAppeared: Bool = false
+    @State private var heroLabelVisible: Bool = false
+    @State private var expandedRegion: String? = nil
+    @State private var showComparison: Bool = false
 
     private var calibration: CalibrationResult? { result.calibration }
 
@@ -28,7 +32,8 @@ struct ScanResultsView: View {
                     confidenceBadge(cal)
                 }
                 regionBreakdown
-                metricsSection
+                metricDetailCarousel
+                comparisonButton
                 actionButtons
                 disclaimerText
             }
@@ -38,6 +43,14 @@ struct ScanResultsView: View {
         }
         .background(CelleuxMeshBackground())
         .sensoryFeedback(.success, trigger: celebrationTrigger)
+        .sensoryFeedback(.selection, trigger: expandedRegion)
+        .sheet(isPresented: $showComparison) {
+            if let previousResult = findPreviousScan() {
+                ScanComparisonSheet(current: result, previous: previousResult)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+            }
+        }
         .onAppear {
             withAnimation(.spring(response: 0.8, dampingFraction: 0.75)) {
                 appeared = true
@@ -60,6 +73,12 @@ struct ScanResultsView: View {
                 try? await Task.sleep(for: .milliseconds(700))
                 withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
                     metricsAppeared = true
+                }
+            }
+            Task {
+                try? await Task.sleep(for: .milliseconds(1600))
+                withAnimation(CelleuxSpring.luxury) {
+                    heroLabelVisible = true
                 }
             }
         }
@@ -146,7 +165,7 @@ struct ScanResultsView: View {
     // MARK: - Score Hero Card
 
     private var scoreHeroCard: some View {
-        GlassCard(depth: .elevated) {
+        GlassCard(depth: .elevated, showShimmer: true) {
             VStack(spacing: 20) {
                 HStack {
                     Text("OVERALL SKIN SCORE")
@@ -163,83 +182,84 @@ struct ScanResultsView: View {
                 ZStack {
                     ChromeRingView(
                         progress: scoreAnimated ? Double(result.overallScore) / 100.0 : 0,
-                        size: 144,
-                        lineWidth: 8,
+                        size: 152,
+                        lineWidth: 9,
                         glowing: $ringGlow
                     )
 
                     VStack(spacing: 2) {
-                        HStack(alignment: .firstTextBaseline, spacing: 2) {
-                            Text("\(displayedScore)")
-                                .font(.system(size: 56, weight: .ultraLight, design: .rounded))
-                                .tracking(2)
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [CelleuxP3.coolSilver, CelleuxColors.warmGold],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
+                        Text("\(displayedScore)")
+                            .font(CelleuxType.metric)
+                            .tracking(CelleuxType.metricTracking)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [CelleuxP3.coolSilver, CelleuxColors.warmGold],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
                                 )
-                                .contentTransition(.numericText(countsDown: false))
+                            )
+                            .animatedNumber()
 
-                            Text("/100")
-                                .font(.system(size: 14, weight: .light))
-                                .foregroundStyle(CelleuxColors.textLabel)
-                        }
-
-                        Text("SKIN HEALTH")
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundStyle(Color(red: 0.15, green: 0.15, blue: 0.20).opacity(0.45))
-                            .tracking(0.8)
+                        Text("Overall Skin Health")
+                            .font(CelleuxType.caption)
+                            .tracking(CelleuxType.captionTracking)
+                            .foregroundStyle(CelleuxColors.textLabel)
                             .textCase(.uppercase)
+                            .opacity(heroLabelVisible ? 1 : 0)
+                            .offset(y: heroLabelVisible ? 0 : 6)
                     }
 
                     CelebrationParticleBurst(isActive: celebrationTrigger > 0)
                 }
 
-                if let cal = calibration, !cal.isCalibrating, let delta = cal.deltaFromBaseline, delta != 0 {
+                if let cal = calibration, !cal.isCalibrating, let delta = cal.deltaFromBaseline, abs(delta) >= 3 {
                     baselineDeltaBadge(delta: delta)
                 } else if result.trend != 0 {
                     trendBadge(trend: result.trend)
                 }
             }
         }
-        .shimmer()
         .staggeredAppear(appeared: appeared, delay: 0.06)
     }
 
     private func baselineDeltaBadge(delta: Double) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: delta > 0 ? "arrow.up.right" : "arrow.down.right")
+        let positive = delta > 0
+        let color = positive ? Color(hex: "4CAF50") : Color(hex: "E53935")
+        return HStack(spacing: 6) {
+            Image(systemName: positive ? "arrow.up.right" : "arrow.down.right")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(delta > 0 ? Color(hex: "4CAF50") : Color(hex: "E53935"))
+                .foregroundStyle(color)
 
-            Text(String(format: "%+.0f points vs your baseline", delta))
+            Text(String(format: "%+.0f from baseline", delta))
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(delta > 0 ? Color(hex: "4CAF50") : Color(hex: "E53935"))
+                .foregroundStyle(color)
+                .contentTransition(.numericText())
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 6)
         .background(
             Capsule()
-                .fill((delta > 0 ? Color(hex: "4CAF50") : Color(hex: "E53935")).opacity(0.08))
+                .fill(color.opacity(0.08))
         )
         .transition(.scale.combined(with: .opacity))
     }
 
     private func trendBadge(trend: Double) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: trend > 0 ? "arrow.up.right" : "arrow.down.right")
+        let positive = trend > 0
+        let color = positive ? Color(hex: "4CAF50") : Color(hex: "E53935")
+        return HStack(spacing: 6) {
+            Image(systemName: positive ? "arrow.up.right" : "arrow.down.right")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(trend > 0 ? Color(hex: "4CAF50") : Color(hex: "E53935"))
+                .foregroundStyle(color)
 
             Text(String(format: "%+.1f vs last scan", trend))
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(trend > 0 ? Color(hex: "4CAF50") : Color(hex: "E53935"))
+                .foregroundStyle(color)
+                .contentTransition(.numericText())
         }
     }
 
-    // MARK: - Region Breakdown
+    // MARK: - Region Breakdown (2×3 Grid)
 
     private var regionBreakdown: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -262,12 +282,12 @@ struct ScanResultsView: View {
                 GridItem(.flexible(), spacing: 12)
             ], spacing: 12) {
                 ForEach(Array(result.regions.enumerated()), id: \.element.id) { index, region in
-                    regionCard(region: region)
+                    regionCard(region: region, index: index)
                         .opacity(regionAppeared ? 1 : 0)
                         .offset(y: regionAppeared ? 0 : 16)
                         .scaleEffect(regionAppeared ? 1 : 0.95)
                         .animation(
-                            .spring(response: 0.5, dampingFraction: 0.75).delay(Double(index) * 0.06),
+                            .spring(response: 0.5, dampingFraction: 0.75).delay(Double(index) * 0.05),
                             value: regionAppeared
                         )
                 }
@@ -276,109 +296,150 @@ struct ScanResultsView: View {
         .staggeredAppear(appeared: appeared, delay: 0.12)
     }
 
-    private func regionCard(region: SkinRegionResult) -> some View {
-        CompactGlassCard {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    ChromeIconBadge(region.icon, size: 28)
+    private func regionCard(region: SkinRegionResult, index: Int) -> some View {
+        let isExpanded = expandedRegion == region.name
+        return Button {
+            withAnimation(CelleuxSpring.snappy) {
+                expandedRegion = isExpanded ? nil : region.name
+            }
+        } label: {
+            CompactGlassCard {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        MetricRingMini(score: region.score, size: 32)
 
-                    Spacer()
+                        Spacer()
 
-                    HStack(spacing: 3) {
-                        Image(systemName: region.trend.icon)
-                            .font(.system(size: 9, weight: .semibold))
-                        Text(region.trend.label)
-                            .font(.system(size: 9, weight: .semibold))
+                        HStack(spacing: 3) {
+                            Image(systemName: region.trend.icon)
+                                .font(.system(size: 9, weight: .semibold))
+                            Text(region.trend.label)
+                                .font(.system(size: 9, weight: .semibold))
+                        }
+                        .foregroundStyle(region.trend.color)
                     }
-                    .foregroundStyle(region.trend.color)
+
+                    Text("\(region.score)")
+                        .font(.system(size: 28, weight: .ultraLight))
+                        .foregroundStyle(CelleuxColors.textPrimary)
+                        .contentTransition(.numericText())
+
+                    Text(region.name)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(CelleuxColors.textPrimary)
+
+                    if isExpanded, let analysisData = result.analysisData {
+                        let regionScores = analysisData.regionData[region.name] ?? RegionScores()
+                        expandedRegionMetrics(regionScores)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
                 }
+            }
+        }
+        .buttonStyle(PressableButtonStyle())
+    }
 
-                Text("\(region.score)")
-                    .font(.system(size: 30, weight: .ultraLight))
-                    .foregroundStyle(CelleuxColors.textPrimary)
-                    .contentTransition(.numericText())
+    private func expandedRegionMetrics(_ scores: RegionScores) -> some View {
+        VStack(spacing: 6) {
+            PremiumDivider()
+            let applicableMetrics = SkinMetricType.allCases.filter { $0 != .overallSkinHealth && $0.isImplemented }
+            ForEach(applicableMetrics, id: \.rawValue) { metric in
+                let score = Int(scores.score(for: metric).rounded())
+                if score > 0 {
+                    HStack {
+                        Image(systemName: metric.icon)
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(CelleuxColors.warmGold)
+                            .frame(width: 14)
 
-                Text(region.name)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(CelleuxColors.textPrimary)
+                        Text(metric.rawValue)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(CelleuxColors.textSecondary)
 
-                HStack(spacing: 4) {
-                    Text(region.keyMetric + ":")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(CelleuxColors.textLabel)
-                    Text(region.keyValue)
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(CelleuxColors.warmGold)
+                        Spacer()
+
+                        Text("\(score)")
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .foregroundStyle(CelleuxColors.textPrimary)
+                            .contentTransition(.numericText())
+                    }
                 }
             }
         }
     }
 
-    // MARK: - Metrics Section
+    // MARK: - 10-Metric Detail Carousel
 
-    private var metricsSection: some View {
+    private var metricDetailCarousel: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Button {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    showMetrics.toggle()
-                }
-            } label: {
-                HStack {
-                    Text("DETAILED METRICS")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(CelleuxColors.textLabel)
-                        .tracking(1.8)
+            HStack {
+                Text("DETAILED METRICS")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(CelleuxColors.textLabel)
+                    .tracking(1.8)
 
-                    Spacer()
+                Spacer()
 
-                    HStack(spacing: 6) {
-                        Text("\(result.metrics.count)")
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .foregroundStyle(CelleuxColors.warmGold.opacity(0.6))
-
-                        Image(systemName: showMetrics ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(CelleuxColors.textLabel)
-                    }
-                }
+                Text("\(result.metrics.count) METRICS")
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundStyle(CelleuxColors.warmGold.opacity(0.5))
+                    .tracking(1)
             }
-            .sensoryFeedback(.selection, trigger: showMetrics)
 
-            if showMetrics {
-                VStack(spacing: 10) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 14) {
                     ForEach(Array(result.metrics.enumerated()), id: \.element.id) { index, metric in
-                        metricRow(metric: metric, index: index)
+                        metricDetailCard(metric: metric, index: index)
+                            .containerRelativeFrame(.horizontal, count: 1, spacing: 14)
                     }
                 }
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .scrollTargetLayout()
             }
+            .scrollTargetBehavior(.viewAligned)
+            .contentMargins(.horizontal, 0)
         }
         .staggeredAppear(appeared: appeared, delay: 0.4)
     }
 
-    private func metricRow(metric: SkinMetric, index: Int) -> some View {
-        CompactGlassCard {
-            VStack(alignment: .leading, spacing: 10) {
+    private func metricDetailCard(metric: SkinMetric, index: Int) -> some View {
+        GlassCard(cornerRadius: 20) {
+            VStack(alignment: .leading, spacing: 14) {
                 HStack {
-                    ChromeIconBadge(metric.icon, size: 24)
+                    ChromeIconBadge(metric.icon, size: 32)
 
-                    Text(metric.name)
-                        .font(.system(size: 13, weight: .medium))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(metric.name)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(CelleuxColors.textPrimary)
+
+                        Text(metricExplanation(for: metric.name))
+                            .font(.system(size: 11, weight: .regular))
+                            .foregroundStyle(CelleuxColors.textLabel)
+                            .lineLimit(2)
+                    }
+
+                    Spacer()
+                }
+
+                HStack(alignment: .firstTextBaseline) {
+                    Text("\(metric.score)")
+                        .font(.system(size: 36, weight: .thin))
                         .foregroundStyle(CelleuxColors.textPrimary)
+                        .animatedNumber()
+
+                    Text("/100")
+                        .font(.system(size: 13, weight: .light))
+                        .foregroundStyle(CelleuxColors.textLabel)
 
                     Spacer()
 
-                    Text("\(metric.score)")
-                        .font(.system(size: 18, weight: .light))
-                        .foregroundStyle(CelleuxColors.textPrimary)
-                        .contentTransition(.numericText())
-
                     if let trend = metric.trend {
-                        HStack(spacing: 2) {
+                        HStack(spacing: 3) {
                             Image(systemName: trend >= 0 ? "arrow.up.right" : "arrow.down.right")
-                                .font(.system(size: 9, weight: .bold))
-                            Text("\(abs(trend))")
                                 .font(.system(size: 10, weight: .bold))
+                            Text(String(format: "%+d", trend))
+                                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                .contentTransition(.numericText())
                         }
                         .foregroundStyle(trend >= 0 ? Color(hex: "4CAF50") : Color(hex: "E53935"))
                     }
@@ -390,32 +451,9 @@ struct ScanResultsView: View {
                     }
                 }
 
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        Capsule()
-                            .fill(CelleuxColors.silver.opacity(0.08))
-                            .frame(height: 5)
+                scoreBarAnimated(score: metric.score, index: index)
 
-                        Capsule()
-                            .fill(
-                                LinearGradient(
-                                    colors: scoreBarColors(for: metric.score),
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .frame(
-                                width: metricsAppeared ? geo.size.width * CGFloat(metric.score) / 100.0 : 0,
-                                height: 5
-                            )
-                            .shadow(color: scoreBarColors(for: metric.score).first?.opacity(0.3) ?? .clear, radius: 4, x: 0, y: 0)
-                            .animation(
-                                .spring(response: 0.8, dampingFraction: 0.7).delay(Double(index) * 0.05),
-                                value: metricsAppeared
-                            )
-                    }
-                }
-                .frame(height: 5)
+                metricSparkline(for: metric.name)
             }
         }
         .opacity(metricsAppeared ? 1 : 0)
@@ -426,10 +464,106 @@ struct ScanResultsView: View {
         )
     }
 
-    private func scoreBarColors(for score: Int) -> [Color] {
-        if score >= 80 { return [Color(hex: "4CAF50"), Color(hex: "66BB6A")] }
-        if score >= 60 { return [CelleuxColors.warmGold, Color(hex: "D4A574")] }
-        return [Color(hex: "E8A838"), Color(hex: "E53935")]
+    private func scoreBarAnimated(score: Int, index: Int) -> some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(CelleuxColors.silver.opacity(0.08))
+                    .frame(height: 6)
+
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: scoreBarColors(for: score),
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(
+                        width: metricsAppeared ? geo.size.width * CGFloat(score) / 100.0 : 0,
+                        height: 6
+                    )
+                    .shadow(color: scoreBarColors(for: score).first?.opacity(0.3) ?? .clear, radius: 4, x: 0, y: 0)
+                    .animation(
+                        .spring(response: 0.8, dampingFraction: 0.7).delay(Double(index) * 0.05),
+                        value: metricsAppeared
+                    )
+            }
+        }
+        .frame(height: 6)
+    }
+
+    private func metricSparkline(for metricName: String) -> some View {
+        Group {
+            if let chartData = buildSparklineData(for: metricName), chartData.count >= 2 {
+                Chart(chartData) { point in
+                    LineMark(
+                        x: .value("Scan", point.index),
+                        y: .value("Score", point.score)
+                    )
+                    .interpolationMethod(.catmullRom)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [CelleuxP3.coolSilver, CelleuxColors.warmGold],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+
+                    AreaMark(
+                        x: .value("Scan", point.index),
+                        y: .value("Score", point.score)
+                    )
+                    .interpolationMethod(.catmullRom)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [CelleuxColors.warmGold.opacity(0.15), CelleuxColors.warmGold.opacity(0.02)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                }
+                .chartXAxis(.hidden)
+                .chartYAxis(.hidden)
+                .chartYScale(domain: 0...100)
+                .frame(height: 40)
+            } else {
+                HStack(spacing: 4) {
+                    Image(systemName: "chart.line.uptrend.xyaxis")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(CelleuxColors.textLabel)
+                    Text("More scans needed for sparkline")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(CelleuxColors.textLabel)
+                }
+                .frame(height: 40)
+                .frame(maxWidth: .infinity, alignment: .center)
+            }
+        }
+    }
+
+    // MARK: - Comparison Button
+
+    private var comparisonButton: some View {
+        Group {
+            if findPreviousScan() != nil {
+                Button {
+                    showComparison = true
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "arrow.left.arrow.right")
+                            .font(.system(size: 14, weight: .medium))
+                        Text("Compare with Last Scan")
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    .foregroundStyle(CelleuxColors.warmGold)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                }
+                .buttonStyle(GlassButtonStyle(style: .primary))
+                .staggeredAppear(appeared: appeared, delay: 0.46)
+            }
+        }
     }
 
     // MARK: - Action Buttons
@@ -450,7 +584,6 @@ struct ScanResultsView: View {
                 .padding(.vertical, 14)
             }
             .buttonStyle(GlassButtonStyle(style: .secondary))
-            .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.5), trigger: false)
 
             Button {
                 onShowHistory()
@@ -590,7 +723,47 @@ struct ScanResultsView: View {
         }
     }
 
-    // MARK: - Disclaimer
+    // MARK: - Helpers
+
+    private func scoreBarColors(for score: Int) -> [Color] {
+        if score >= 80 { return [Color(hex: "4CAF50"), Color(hex: "66BB6A")] }
+        if score >= 60 { return [CelleuxColors.warmGold, Color(hex: "D4A574")] }
+        return [Color(hex: "E8A838"), Color(hex: "E53935")]
+    }
+
+    private func metricExplanation(for name: String) -> String {
+        switch name {
+        case "Texture Evenness": "Smoothness and uniformity of skin surface"
+        case "Apparent Hydration": "Moisture levels across your skin"
+        case "Brightness": "Radiance and luminosity of your skin"
+        case "Redness": "Inflammation and redness indicators"
+        case "Pore Visibility": "Visibility and size of pores"
+        case "Tone Uniformity": "Evenness of skin color across regions"
+        case "Under-Eye Quality": "Dark circle and under-eye area health"
+        case "Wrinkle Depth": "Fine lines and wrinkle presence"
+        case "Elasticity": "Skin firmness and recovery"
+        default: "Skin health metric"
+        }
+    }
+
+    private func findPreviousScan() -> SkinScanResult? {
+        let sorted = history.sorted { $0.date > $1.date }
+        guard let currentIndex = sorted.firstIndex(where: { $0.id == result.id }) else {
+            return sorted.first(where: { $0.id != result.id })
+        }
+        let nextIndex = sorted.index(after: currentIndex)
+        guard nextIndex < sorted.endIndex else { return nil }
+        return sorted[nextIndex]
+    }
+
+    private func buildSparklineData(for metricName: String) -> [SparklinePoint]? {
+        let sorted = history.sorted { $0.date < $1.date }.suffix(10)
+        guard sorted.count >= 2 else { return nil }
+        return Array(sorted.enumerated().map { index, scan in
+            let score = scan.metrics.first(where: { $0.name == metricName })?.score ?? 0
+            return SparklinePoint(index: index, score: Double(score))
+        })
+    }
 
     private var disclaimerText: some View {
         Text("Skin analysis tracks visual appearance changes over time. This is not a medical assessment. For skin health concerns, consult a dermatologist.")
@@ -600,5 +773,207 @@ struct ScanResultsView: View {
             .padding(.horizontal, 24)
             .padding(.top, 8)
             .staggeredAppear(appeared: appeared, delay: 0.56)
+    }
+}
+
+// MARK: - Mini Ring Component
+
+struct MetricRingMini: View {
+    let score: Int
+    let size: CGFloat
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(CelleuxColors.silver.opacity(0.1), lineWidth: 3)
+                .frame(width: size, height: size)
+
+            Circle()
+                .trim(from: 0, to: Double(score) / 100.0)
+                .stroke(
+                    LinearGradient(
+                        colors: [CelleuxP3.coolSilver, CelleuxColors.warmGold],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                )
+                .frame(width: size, height: size)
+                .rotationEffect(.degrees(-90))
+                .shadow(color: CelleuxColors.goldGlow.opacity(0.2), radius: 3, x: 0, y: 0)
+
+            Text("\(score)")
+                .font(.system(size: size * 0.3, weight: .semibold))
+                .foregroundStyle(CelleuxColors.textPrimary)
+        }
+    }
+}
+
+// MARK: - Sparkline Data
+
+nonisolated struct SparklinePoint: Identifiable, Sendable {
+    let id = UUID()
+    let index: Int
+    let score: Double
+}
+
+// MARK: - Scan Comparison Sheet
+
+struct ScanComparisonSheet: View {
+    let current: SkinScanResult
+    let previous: SkinScanResult
+
+    @State private var appeared: Bool = false
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 24) {
+                VStack(spacing: 4) {
+                    Text("SCAN COMPARISON")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(CelleuxColors.textLabel)
+                        .tracking(1.8)
+
+                    Text("\(previous.shortDateString) → \(current.shortDateString)")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(CelleuxColors.textSecondary)
+                }
+                .padding(.top, 12)
+
+                overallComparison
+
+                metricBars
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 40)
+        }
+        .background(CelleuxMeshBackground())
+        .onAppear {
+            withAnimation(CelleuxSpring.luxury) {
+                appeared = true
+            }
+        }
+    }
+
+    private var overallComparison: some View {
+        let delta = current.overallScore - previous.overallScore
+        return GlassCard(depth: .elevated) {
+            HStack {
+                VStack(spacing: 4) {
+                    Text("THEN")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundStyle(CelleuxColors.textLabel)
+                        .tracking(1)
+
+                    Text("\(previous.overallScore)")
+                        .font(.system(size: 36, weight: .ultraLight))
+                        .foregroundStyle(CelleuxColors.textSecondary)
+                }
+
+                Spacer()
+
+                VStack(spacing: 4) {
+                    Image(systemName: delta >= 0 ? "arrow.up.right.circle.fill" : "arrow.down.right.circle.fill")
+                        .font(.system(size: 24, weight: .light))
+                        .foregroundStyle(delta >= 0 ? Color(hex: "4CAF50") : Color(hex: "E53935"))
+
+                    Text(String(format: "%+d", delta))
+                        .font(.system(size: 16, weight: .bold, design: .monospaced))
+                        .foregroundStyle(delta >= 0 ? Color(hex: "4CAF50") : Color(hex: "E53935"))
+                        .contentTransition(.numericText())
+                }
+
+                Spacer()
+
+                VStack(spacing: 4) {
+                    Text("NOW")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundStyle(CelleuxColors.warmGold)
+                        .tracking(1)
+
+                    Text("\(current.overallScore)")
+                        .font(.system(size: 36, weight: .ultraLight))
+                        .foregroundStyle(CelleuxColors.textPrimary)
+                }
+            }
+        }
+        .staggeredAppear(appeared: appeared, delay: 0)
+    }
+
+    private var metricBars: some View {
+        VStack(spacing: 10) {
+            ForEach(Array(current.metrics.enumerated()), id: \.element.id) { index, currentMetric in
+                let previousMetric = previous.metrics.first { $0.name == currentMetric.name }
+                let prevScore = previousMetric?.score ?? 0
+                let delta = currentMetric.score - prevScore
+                let improved = delta >= 0
+
+                CompactGlassCard {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Image(systemName: currentMetric.icon)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(CelleuxColors.warmGold)
+
+                            Text(currentMetric.name)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(CelleuxColors.textPrimary)
+
+                            Spacer()
+
+                            HStack(spacing: 3) {
+                                Image(systemName: improved ? "arrow.up.right" : "arrow.down.right")
+                                    .font(.system(size: 9, weight: .bold))
+                                Text(String(format: "%+d", delta))
+                                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                    .contentTransition(.numericText())
+                            }
+                            .foregroundStyle(improved ? Color(hex: "4CAF50") : Color(hex: "E8A838"))
+                        }
+
+                        HStack(spacing: 8) {
+                            comparisonBar(score: prevScore, label: "Before", isActive: false)
+                            comparisonBar(score: currentMetric.score, label: "Now", isActive: true)
+                        }
+                    }
+                }
+                .staggeredAppear(appeared: appeared, delay: 0.05 + Double(index) * 0.04)
+            }
+        }
+    }
+
+    private func comparisonBar(score: Int, label: String, isActive: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack {
+                Text(label)
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(isActive ? CelleuxColors.textSecondary : CelleuxColors.textLabel)
+
+                Spacer()
+
+                Text("\(score)")
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(isActive ? CelleuxColors.textPrimary : CelleuxColors.textLabel)
+                    .contentTransition(.numericText())
+            }
+
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(CelleuxColors.silver.opacity(0.06))
+                        .frame(height: 4)
+
+                    Capsule()
+                        .fill(
+                            isActive
+                                ? LinearGradient(colors: [CelleuxColors.warmGold.opacity(0.8), CelleuxColors.warmGold], startPoint: .leading, endPoint: .trailing)
+                                : LinearGradient(colors: [CelleuxColors.silver.opacity(0.3), CelleuxColors.silver.opacity(0.2)], startPoint: .leading, endPoint: .trailing)
+                        )
+                        .frame(width: appeared ? geo.size.width * CGFloat(score) / 100.0 : 0, height: 4)
+                        .animation(.spring(response: 0.8, dampingFraction: 0.7), value: appeared)
+                }
+            }
+            .frame(height: 4)
+        }
     }
 }
