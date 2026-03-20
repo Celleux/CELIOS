@@ -7,6 +7,12 @@ struct ProgressComparisonView: View {
     let onDismiss: () -> Void
 
     @State private var appeared: Bool = false
+    @State private var showAllMetrics: Bool = false
+
+    private static let primaryMetrics: Set<SkinMetricType> = [
+        .textureEvenness, .apparentHydration, .brightnessRadiance,
+        .rednessInflammation, .poreVisibility, .toneUniformity
+    ]
 
     private var comparisonResult: SkinScanResult? {
         let calendar = Calendar.current
@@ -161,43 +167,38 @@ struct ProgressComparisonView: View {
                 .tracking(1.8)
 
             if let currentData = currentResult?.analysisData, let pastData = comparisonResult?.analysisData {
-                let metrics = SkinMetricType.allCases.filter { $0 != .overallSkinHealth && $0.isImplemented }
-                ForEach(Array(metrics.enumerated()), id: \.element.rawValue) { index, metric in
-                    let current = currentData.score(for: metric)
-                    let past = pastData.score(for: metric)
-                    let delta = current - past
-                    let improved = delta >= 0
+                let allMetrics = SkinMetricType.allCases.filter { $0 != .overallSkinHealth && $0.isImplemented }
+                let primary = allMetrics.filter { Self.primaryMetrics.contains($0) }
+                let secondary = allMetrics.filter { !Self.primaryMetrics.contains($0) }
 
-                    CompactGlassCard {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Image(systemName: metric.icon)
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(CelleuxColors.warmGold)
+                ForEach(Array(primary.enumerated()), id: \.element.rawValue) { index, metric in
+                    progressMetricRow(metric: metric, currentData: currentData, pastData: pastData, index: index)
+                }
 
-                                Text(metric.rawValue)
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundStyle(CelleuxColors.textPrimary)
-
-                                Spacer()
-
-                                HStack(spacing: 3) {
-                                    Image(systemName: improved ? "arrow.up.right" : "arrow.down.right")
-                                        .font(.system(size: 9, weight: .bold))
-                                    Text(String(format: "%+.0f", delta))
-                                        .font(.system(size: 11, weight: .bold, design: .monospaced))
-                                        .contentTransition(.numericText())
-                                }
-                                .foregroundStyle(improved ? Color(hex: "4CAF50") : Color(hex: "E8A838"))
-                            }
-
-                            HStack(spacing: 8) {
-                                progressComparisonBar(score: past, label: "Before", isActive: false)
-                                progressComparisonBar(score: current, label: "Now", isActive: true)
-                            }
+                if !secondary.isEmpty {
+                    if showAllMetrics {
+                        ForEach(Array(secondary.enumerated()), id: \.element.rawValue) { index, metric in
+                            progressMetricRow(metric: metric, currentData: currentData, pastData: pastData, index: primary.count + index)
+                                .transition(.opacity.combined(with: .move(edge: .top)))
                         }
+                    } else {
+                        Button {
+                            withAnimation(CelleuxSpring.luxury) {
+                                showAllMetrics = true
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 11, weight: .medium))
+                                Text("See All Metrics")
+                                    .font(.system(size: 13, weight: .semibold))
+                            }
+                            .foregroundStyle(CelleuxColors.warmGold)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                        }
+                        .buttonStyle(GlassButtonStyle(style: .primary))
                     }
-                    .staggeredAppear(appeared: appeared, delay: 0.08 + Double(index) * 0.04)
                 }
             } else {
                 GlassCard {
@@ -213,6 +214,44 @@ struct ProgressComparisonView: View {
                 .staggeredAppear(appeared: appeared, delay: 0.1)
             }
         }
+    }
+
+    private func progressMetricRow(metric: SkinMetricType, currentData: SkinAnalysisData, pastData: SkinAnalysisData, index: Int) -> some View {
+        let current = currentData.score(for: metric)
+        let past = pastData.score(for: metric)
+        let delta = current - past
+        let improved = delta >= 0
+
+        return CompactGlassCard {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Image(systemName: metric.icon)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(CelleuxColors.warmGold)
+
+                    Text(metric.rawValue)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(CelleuxColors.textPrimary)
+
+                    Spacer()
+
+                    HStack(spacing: 3) {
+                        Image(systemName: improved ? "arrow.up.right" : "arrow.down.right")
+                            .font(.system(size: 9, weight: .bold))
+                        Text(String(format: "%+.0f", delta))
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .contentTransition(.numericText())
+                    }
+                    .foregroundStyle(improved ? Color(hex: "4CAF50") : Color(hex: "E8A838"))
+                }
+
+                HStack(spacing: 8) {
+                    progressComparisonBar(score: past, label: "Before", isActive: false)
+                    progressComparisonBar(score: current, label: "Now", isActive: true)
+                }
+            }
+        }
+        .staggeredAppear(appeared: appeared, delay: 0.08 + Double(index) * 0.04)
     }
 
     private func progressComparisonBar(score: Double, label: String, isActive: Bool) -> some View {

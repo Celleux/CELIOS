@@ -15,7 +15,7 @@ struct ScanResultsView: View {
     @State private var regionAppeared: Bool = false
     @State private var metricsAppeared: Bool = false
     @State private var heroLabelVisible: Bool = false
-    @State private var expandedRegion: String? = nil
+    @State private var selectedRegionForSheet: SkinRegionResult? = nil
     @State private var showComparison: Bool = false
     @State private var shareImage: UIImage? = nil
     @State private var isGeneratingShare: Bool = false
@@ -48,7 +48,13 @@ struct ScanResultsView: View {
         }
         .background(CelleuxMeshBackground())
         .sensoryFeedback(.success, trigger: celebrationTrigger)
-        .sensoryFeedback(.selection, trigger: expandedRegion)
+        .sensoryFeedback(.selection, trigger: selectedRegionForSheet?.id)
+        .sheet(item: $selectedRegionForSheet) { region in
+            RegionDetailSheet(region: region, analysisData: result.analysisData)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationContentInteraction(.scrolls)
+        }
         .sheet(isPresented: $showComparison) {
             if let previousResult = findPreviousScan() {
                 ScanComparisonSheet(current: result, previous: previousResult)
@@ -280,11 +286,8 @@ struct ScanResultsView: View {
     }
 
     private func regionCard(region: SkinRegionResult, index: Int) -> some View {
-        let isExpanded = expandedRegion == region.name
-        return Button {
-            withAnimation(CelleuxSpring.snappy) {
-                expandedRegion = isExpanded ? nil : region.name
-            }
+        Button {
+            selectedRegionForSheet = region
         } label: {
             CompactGlassCard {
                 VStack(alignment: .leading, spacing: 10) {
@@ -310,45 +313,10 @@ struct ScanResultsView: View {
                     Text(region.name)
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(CelleuxColors.textPrimary)
-
-                    if isExpanded, let analysisData = result.analysisData {
-                        let regionScores = analysisData.regionData[region.name] ?? RegionScores()
-                        expandedRegionMetrics(regionScores)
-                            .transition(.opacity.combined(with: .move(edge: .top)))
-                    }
                 }
             }
         }
         .buttonStyle(PressableButtonStyle())
-    }
-
-    private func expandedRegionMetrics(_ scores: RegionScores) -> some View {
-        VStack(spacing: 6) {
-            PremiumDivider()
-            let applicableMetrics = SkinMetricType.allCases.filter { $0 != .overallSkinHealth && $0.isImplemented }
-            ForEach(applicableMetrics, id: \.rawValue) { metric in
-                let score = Int(scores.score(for: metric).rounded())
-                if score > 0 {
-                    HStack {
-                        Image(systemName: metric.icon)
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(CelleuxColors.warmGold)
-                            .frame(width: 14)
-
-                        Text(metric.rawValue)
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(CelleuxColors.textSecondary)
-
-                        Spacer()
-
-                        Text("\(score)")
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
-                            .foregroundStyle(CelleuxColors.textPrimary)
-                            .contentTransition(.numericText())
-                    }
-                }
-            }
-        }
     }
 
     // MARK: - 10-Metric Detail Carousel
@@ -971,6 +939,7 @@ struct ScanComparisonSheet: View {
     let previous: SkinScanResult
 
     @State private var appeared: Bool = false
+    @State private var showAllMetrics: Bool = false
 
     var body: some View {
         ScrollView {
@@ -1047,46 +1016,89 @@ struct ScanComparisonSheet: View {
         .staggeredAppear(appeared: appeared, delay: 0)
     }
 
+    private static let primaryMetricNames: Set<String> = [
+        "Texture Evenness", "Apparent Hydration", "Brightness",
+        "Redness", "Pore Visibility", "Tone Uniformity"
+    ]
+
+    private var primaryMetrics: [(index: Int, metric: SkinMetric)] {
+        Array(current.metrics.enumerated()).filter { Self.primaryMetricNames.contains($0.element.name) }
+    }
+
+    private var secondaryMetrics: [(index: Int, metric: SkinMetric)] {
+        Array(current.metrics.enumerated()).filter { !Self.primaryMetricNames.contains($0.element.name) }
+    }
+
     private var metricBars: some View {
         VStack(spacing: 10) {
-            ForEach(Array(current.metrics.enumerated()), id: \.element.id) { index, currentMetric in
-                let previousMetric = previous.metrics.first { $0.name == currentMetric.name }
-                let prevScore = previousMetric?.score ?? 0
-                let delta = currentMetric.score - prevScore
-                let improved = delta >= 0
+            ForEach(primaryMetrics, id: \.metric.id) { index, currentMetric in
+                comparisonMetricRow(currentMetric: currentMetric, index: index)
+            }
 
-                CompactGlassCard {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Image(systemName: currentMetric.icon)
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(CelleuxColors.warmGold)
-
-                            Text(currentMetric.name)
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(CelleuxColors.textPrimary)
-
-                            Spacer()
-
-                            HStack(spacing: 3) {
-                                Image(systemName: improved ? "arrow.up.right" : "arrow.down.right")
-                                    .font(.system(size: 9, weight: .bold))
-                                Text(String(format: "%+d", delta))
-                                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                                    .contentTransition(.numericText())
-                            }
-                            .foregroundStyle(improved ? Color(hex: "4CAF50") : Color(hex: "E8A838"))
-                        }
-
-                        HStack(spacing: 8) {
-                            comparisonBar(score: prevScore, label: "Before", isActive: false)
-                            comparisonBar(score: currentMetric.score, label: "Now", isActive: true)
-                        }
+            if !secondaryMetrics.isEmpty {
+                if showAllMetrics {
+                    ForEach(secondaryMetrics, id: \.metric.id) { index, currentMetric in
+                        comparisonMetricRow(currentMetric: currentMetric, index: index)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
                     }
+                } else {
+                    Button {
+                        withAnimation(CelleuxSpring.luxury) {
+                            showAllMetrics = true
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 11, weight: .medium))
+                            Text("See All Metrics")
+                                .font(.system(size: 13, weight: .semibold))
+                        }
+                        .foregroundStyle(CelleuxColors.warmGold)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                    }
+                    .buttonStyle(GlassButtonStyle(style: .primary))
                 }
-                .staggeredAppear(appeared: appeared, delay: 0.05 + Double(index) * 0.04)
             }
         }
+    }
+
+    private func comparisonMetricRow(currentMetric: SkinMetric, index: Int) -> some View {
+        let previousMetric = previous.metrics.first { $0.name == currentMetric.name }
+        let prevScore = previousMetric?.score ?? 0
+        let delta = currentMetric.score - prevScore
+        let improved = delta >= 0
+
+        return CompactGlassCard {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Image(systemName: currentMetric.icon)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(CelleuxColors.warmGold)
+
+                    Text(currentMetric.name)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(CelleuxColors.textPrimary)
+
+                    Spacer()
+
+                    HStack(spacing: 3) {
+                        Image(systemName: improved ? "arrow.up.right" : "arrow.down.right")
+                            .font(.system(size: 9, weight: .bold))
+                        Text(String(format: "%+d", delta))
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .contentTransition(.numericText())
+                    }
+                    .foregroundStyle(improved ? Color(hex: "4CAF50") : Color(hex: "E8A838"))
+                }
+
+                HStack(spacing: 8) {
+                    comparisonBar(score: prevScore, label: "Before", isActive: false)
+                    comparisonBar(score: currentMetric.score, label: "Now", isActive: true)
+                }
+            }
+        }
+        .staggeredAppear(appeared: appeared, delay: 0.05 + Double(index) * 0.04)
     }
 
     private func comparisonBar(score: Int, label: String, isActive: Bool) -> some View {
@@ -1122,5 +1134,153 @@ struct ScanComparisonSheet: View {
             }
             .frame(height: 4)
         }
+    }
+}
+
+// MARK: - Region Detail Sheet
+
+struct RegionDetailSheet: View {
+    let region: SkinRegionResult
+    let analysisData: SkinAnalysisData?
+
+    @State private var appeared: Bool = false
+
+    private var regionScores: RegionScores {
+        analysisData?.regionData[region.name] ?? RegionScores()
+    }
+
+    private var applicableMetrics: [(metric: SkinMetricType, score: Int)] {
+        SkinMetricType.allCases
+            .filter { $0 != .overallSkinHealth && $0.isImplemented }
+            .compactMap { metric in
+                let score = Int(regionScores.score(for: metric).rounded())
+                guard score > 0 else { return nil }
+                return (metric: metric, score: score)
+            }
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                regionHeader
+                PremiumDivider()
+                metricsList
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 40)
+        }
+        .background(CelleuxMeshBackground())
+        .onAppear {
+            withAnimation(CelleuxSpring.luxury) {
+                appeared = true
+            }
+        }
+    }
+
+    private var regionHeader: some View {
+        VStack(spacing: 16) {
+            ZStack {
+                MetricRingMini(score: region.score, size: 72)
+
+                Text("\(region.score)")
+                    .font(.system(size: 28, weight: .ultraLight))
+                    .foregroundStyle(CelleuxColors.textPrimary)
+                    .contentTransition(.numericText())
+            }
+
+            VStack(spacing: 4) {
+                Text(region.name.uppercased())
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(CelleuxColors.textPrimary)
+                    .tracking(1.5)
+
+                HStack(spacing: 4) {
+                    Image(systemName: region.trend.icon)
+                        .font(.system(size: 10, weight: .semibold))
+                    Text(region.trend.label)
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundStyle(region.trend.color)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .staggeredAppear(appeared: appeared, delay: 0)
+    }
+
+    private var metricsList: some View {
+        VStack(spacing: 10) {
+            HStack {
+                Text("METRICS")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(CelleuxColors.textLabel)
+                    .tracking(1.8)
+
+                Spacer()
+
+                Text("\(applicableMetrics.count) ACTIVE")
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundStyle(CelleuxColors.warmGold.opacity(0.5))
+                    .tracking(1)
+            }
+
+            ForEach(Array(applicableMetrics.enumerated()), id: \.element.metric.rawValue) { index, item in
+                regionMetricRow(metric: item.metric, score: item.score, index: index)
+                    .staggeredAppear(appeared: appeared, delay: 0.05 + Double(index) * 0.04)
+            }
+        }
+    }
+
+    private func regionMetricRow(metric: SkinMetricType, score: Int, index: Int) -> some View {
+        CompactGlassCard {
+            HStack(spacing: 12) {
+                ChromeIconBadge(metric.icon, size: 32)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(metric.rawValue)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(CelleuxColors.textPrimary)
+
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Capsule()
+                                .fill(CelleuxColors.silver.opacity(0.08))
+                                .frame(height: 5)
+
+                            Capsule()
+                                .fill(
+                                    LinearGradient(
+                                        colors: regionMetricBarColors(for: score),
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .frame(
+                                    width: appeared ? geo.size.width * CGFloat(score) / 100.0 : 0,
+                                    height: 5
+                                )
+                                .shadow(color: regionMetricBarColors(for: score).first?.opacity(0.25) ?? .clear, radius: 3, x: 0, y: 0)
+                                .animation(
+                                    .spring(response: 0.7, dampingFraction: 0.7).delay(Double(index) * 0.04),
+                                    value: appeared
+                                )
+                        }
+                    }
+                    .frame(height: 5)
+                }
+
+                Text("\(score)")
+                    .font(.system(size: 18, weight: .thin))
+                    .foregroundStyle(CelleuxColors.textPrimary)
+                    .contentTransition(.numericText())
+                    .frame(width: 32, alignment: .trailing)
+            }
+        }
+    }
+
+    private func regionMetricBarColors(for score: Int) -> [Color] {
+        if score >= 80 { return [Color(hex: "4CAF50"), Color(hex: "66BB6A")] }
+        if score >= 60 { return [CelleuxColors.warmGold, Color(hex: "D4A574")] }
+        return [Color(hex: "E8A838"), Color(hex: "E53935")]
     }
 }
