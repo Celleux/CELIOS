@@ -1,5 +1,29 @@
 import SwiftUI
 
+nonisolated struct LightingConditions: Sendable {
+    var ambientIntensity: Double
+    var colorTemperature: Double
+    var correctionApplied: Bool
+
+    var isAcceptable: Bool {
+        ambientIntensity >= 500 && ambientIntensity <= 2000
+    }
+
+    var needsChromaticAdaptation: Bool {
+        abs(colorTemperature - 6500) > 1000
+    }
+
+    var qualityLevel: LightingQuality {
+        if ambientIntensity < 500 || ambientIntensity > 2000 {
+            return .poor
+        }
+        if abs(colorTemperature - 6500) > 1000 {
+            return .fair
+        }
+        return .good
+    }
+}
+
 nonisolated enum ScanPhase: String, Sendable {
     case preScan
     case scanning
@@ -188,6 +212,7 @@ nonisolated struct SkinAnalysisData: Sendable {
     var laplacianVariance: Double = 0
     var saturationVariance: Double = 0
     var regionData: [String: RegionScores] = [:]
+    var lightingConditions: LightingConditions?
 
     var brightnessScore: Double { brightnessRadianceScore }
     var textureScore: Double { textureEvennessScore }

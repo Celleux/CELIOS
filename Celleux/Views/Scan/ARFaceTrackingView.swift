@@ -12,6 +12,7 @@ struct ARFaceTrackingView: UIViewRepresentable {
     var onFrameCaptured: ((CVPixelBuffer) -> Void)?
     var onElasticityComputed: ((Double) -> Void)?
     var onAllCapturesFailed: (() -> Void)?
+    var onLightingUpdated: ((LightingConditions) -> Void)?
 
     func makeUIView(context: Context) -> ARSCNView {
         let sceneView = ARSCNView(frame: .zero)
@@ -42,6 +43,7 @@ struct ARFaceTrackingView: UIViewRepresentable {
         context.coordinator.onFrameCaptured = onFrameCaptured
         context.coordinator.onElasticityComputed = onElasticityComputed
         context.coordinator.onAllCapturesFailed = onAllCapturesFailed
+        context.coordinator.onLightingUpdated = onLightingUpdated
         context.coordinator.updateMeshAppearance()
     }
 
@@ -64,6 +66,7 @@ struct ARFaceTrackingView: UIViewRepresentable {
         var onFrameCaptured: ((CVPixelBuffer) -> Void)?
         var onElasticityComputed: ((Double) -> Void)?
         var onAllCapturesFailed: (() -> Void)?
+        var onLightingUpdated: ((LightingConditions) -> Void)?
 
         private var faceNode: SCNNode?
         private var blendShapeSamples: [(timestamp: TimeInterval, jawOpen: Double, cheekPuff: Double, mouthSmileL: Double, mouthSmileR: Double)] = []
@@ -85,6 +88,8 @@ struct ARFaceTrackingView: UIViewRepresentable {
         private var hasCapturedFrame: Bool = false
         private var captureRetryCount: Int = 0
         private var lastUpdateTime: TimeInterval = 0
+        private var lastLightingUpdate: TimeInterval = 0
+        private var latestLightingConditions: LightingConditions?
 
         private let captureThresholds: [Double] = [0.8, 0.85, 0.9, 0.95]
 
@@ -151,7 +156,23 @@ struct ARFaceTrackingView: UIViewRepresentable {
         }
 
         nonisolated func session(_ session: ARSession, didUpdate frame: ARFrame) {
+            let lightEstimate = frame.lightEstimate
+            let ambientIntensity = lightEstimate?.ambientIntensity ?? 1000
+            let colorTemperature = lightEstimate?.ambientColorTemperature ?? 6500
+
             Task { @MainActor in
+                let now = CACurrentMediaTime()
+                if now - self.lastLightingUpdate > 0.5 {
+                    self.lastLightingUpdate = now
+                    let conditions = LightingConditions(
+                        ambientIntensity: Double(ambientIntensity),
+                        colorTemperature: Double(colorTemperature),
+                        correctionApplied: false
+                    )
+                    self.latestLightingConditions = conditions
+                    self.onLightingUpdated?(conditions)
+                }
+
                 guard self.isScanning else { return }
                 guard self.captureRetryCount < self.captureThresholds.count else {
                     if !self.hasCapturedFrame {

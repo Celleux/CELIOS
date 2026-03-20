@@ -5,7 +5,7 @@ import Accelerate
 
 nonisolated class SkinAnalysisService: Sendable {
 
-    func analyze(pixelBuffer: CVPixelBuffer, blendShapeElasticity: Double? = nil) async -> SkinAnalysisData? {
+    func analyze(pixelBuffer: CVPixelBuffer, blendShapeElasticity: Double? = nil, lightingConditions: LightingConditions? = nil) async -> SkinAnalysisData? {
         let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
         let context = CIContext()
 
@@ -16,8 +16,11 @@ nonisolated class SkinAnalysisService: Sendable {
         let namedRegions = await detectNamedFaceRegions(in: cgImage)
 
         guard !namedRegions.isEmpty else {
-            return analyzeFullImage(cgImage: cgImage, context: context, blendShapeElasticity: blendShapeElasticity)
+            return analyzeFullImage(cgImage: cgImage, context: context, blendShapeElasticity: blendShapeElasticity, lightingConditions: lightingConditions)
         }
+
+        let adaptationMatrix = lightingConditions.flatMap { computeBradfordAdaptationMatrix(colorTemperature: $0.colorTemperature) }
+        let correctionApplied = adaptationMatrix != nil
 
         var regionData: [String: RegionScores] = [:]
         var allITA: [Double] = []
@@ -32,7 +35,7 @@ nonisolated class SkinAnalysisService: Sendable {
 
         for (name, rect) in namedRegions {
             guard let cropped = cgImage.cropping(to: rect),
-                  let metrics = computeRegionMetrics(cgImage: cropped, context: context) else { continue }
+                  let metrics = computeRegionMetrics(cgImage: cropped, context: context, adaptationMatrix: adaptationMatrix) else { continue }
 
             let tScore = mapTextureToScore(metrics.texture)
             let hScore = mapHydrationToScore(metrics.saturationVariance)
@@ -138,10 +141,18 @@ nonisolated class SkinAnalysisService: Sendable {
 
         data.overallScore = SkinAnalysisData.computeOverall(from: data)
 
+        if let lc = lightingConditions {
+            data.lightingConditions = LightingConditions(
+                ambientIntensity: lc.ambientIntensity,
+                colorTemperature: lc.colorTemperature,
+                correctionApplied: correctionApplied
+            )
+        }
+
         return data
     }
 
-    private func analyzeFullImage(cgImage: CGImage, context: CIContext, blendShapeElasticity: Double? = nil) -> SkinAnalysisData? {
+    private func analyzeFullImage(cgImage: CGImage, context: CIContext, blendShapeElasticity: Double? = nil, lightingConditions: LightingConditions? = nil) -> SkinAnalysisData? {
         let w = cgImage.width
         let h = cgImage.height
         let centerRect = CGRect(
@@ -150,8 +161,9 @@ nonisolated class SkinAnalysisService: Sendable {
             width: CGFloat(w) * 0.5,
             height: CGFloat(h) * 0.5
         )
+        let adaptationMatrix = lightingConditions.flatMap { computeBradfordAdaptationMatrix(colorTemperature: $0.colorTemperature) }
         guard let cropped = cgImage.cropping(to: centerRect),
-              let metrics = computeRegionMetrics(cgImage: cropped, context: context) else {
+              let metrics = computeRegionMetrics(cgImage: cropped, context: context, adaptationMatrix: adaptationMatrix) else {
             return nil
         }
 
@@ -204,6 +216,15 @@ nonisolated class SkinAnalysisService: Sendable {
         )
 
         data.overallScore = SkinAnalysisData.computeOverall(from: data)
+
+        if let lc = lightingConditions {
+            let correctionApplied = adaptationMatrix != nil
+            data.lightingConditions = LightingConditions(
+                ambientIntensity: lc.ambientIntensity,
+                colorTemperature: lc.colorTemperature,
+                correctionApplied: correctionApplied
+            )
+        }
 
         return data
     }
@@ -311,7 +332,7 @@ nonisolated class SkinAnalysisService: Sendable {
         let gaborEnergy: Double
     }
 
-    private func computeRegionMetrics(cgImage: CGImage, context: CIContext) -> InternalRegionMetrics? {
+    private func computeRegionMetrics(cgImage: CGImage, context: CIContext, adaptationMatrix: [[Double]]? = nil) -> InternalRegionMetrics? {
         let width = cgImage.width
         let height = cgImage.height
         let totalPixels = width * height
@@ -340,9 +361,13 @@ nonisolated class SkinAnalysisService: Sendable {
 
             guard offset + 2 < CFDataGetLength(data) else { continue }
 
-            let r = Double(ptr[offset]) / 255.0
-            let g = Double(ptr[offset + 1]) / 255.0
-            let b = Double(ptr[offset + 2]) / 255.0
+            var r = Double(ptr[offset]) / 255.0
+            var g = Double(ptr[offset + 1]) / 255.0
+            var b = Double(ptr[offset + 2]) / 255.0
+
+            if let matrix = adaptationMatrix {
+                (r, g, b) = applyBradfordCorrection(r: r, g: g, b: b, matrix: matrix)
+            }
 
             let lab = rgbToLab(r: r, g: g, b: b)
             lStarSum += lab.l
@@ -551,6 +576,121 @@ nonisolated class SkinAnalysisService: Sendable {
 
         guard sampleCount > 0 else { return 100 }
         return totalEnergy / Double(sampleCount)
+    }
+
+    private nonisolated func colorTemperatureToXYZ(kelvin: Double) -> (x: Double, y: Double, z: Double) {
+        let t = kelvin
+        let x: Double
+        if t >= 1667 && t <= 4000 {
+            x = -0.2661239e9 / (t * t * t) - 0.2343589e6 / (t * t) + 0.8776956e3 / t + 0.179910
+        } else {
+            x = -3.0258469e9 / (t * t * t) + 2.1070379e6 / (t * t) + 0.2226347e3 / t + 0.240390
+        }
+
+        let y: Double
+        if t >= 1667 && t <= 2222 {
+            y = -1.1063814 * x * x * x - 1.34811020 * x * x + 2.18555832 * x - 0.20219683
+        } else if t <= 4000 {
+            y = -0.9549476 * x * x * x - 1.37418593 * x * x + 2.09137015 * x - 0.16748867
+        } else {
+            y = 3.0817580 * x * x * x - 5.87338670 * x * x + 3.75112997 * x - 0.37001483
+        }
+
+        guard y > 0 else { return (0.9505, 1.0, 1.0890) }
+        let bigY = 1.0
+        let bigX = (bigY / y) * x
+        let bigZ = (bigY / y) * (1.0 - x - y)
+        return (bigX, bigY, bigZ)
+    }
+
+    private nonisolated func computeBradfordAdaptationMatrix(colorTemperature: Double) -> [[Double]]? {
+        guard abs(colorTemperature - 6500) > 1000 else { return nil }
+
+        let source = colorTemperatureToXYZ(kelvin: colorTemperature)
+        let dest = colorTemperatureToXYZ(kelvin: 6500)
+
+        let bradfordM: [[Double]] = [
+            [0.8951,  0.2664, -0.1614],
+            [-0.7502, 1.7135,  0.0367],
+            [0.0389, -0.0685,  1.0296]
+        ]
+
+        let bradfordMInv: [[Double]] = [
+            [0.9869929, -0.1470543,  0.1599627],
+            [0.4323053,  0.5183603,  0.0492912],
+            [-0.0085287, 0.0400428,  0.9684867]
+        ]
+
+        let srcLMS = multiplyMatVec(bradfordM, vec: [source.x, source.y, source.z])
+        let dstLMS = multiplyMatVec(bradfordM, vec: [dest.x, dest.y, dest.z])
+
+        guard srcLMS[0] != 0, srcLMS[1] != 0, srcLMS[2] != 0 else { return nil }
+
+        let scale: [[Double]] = [
+            [dstLMS[0] / srcLMS[0], 0, 0],
+            [0, dstLMS[1] / srcLMS[1], 0],
+            [0, 0, dstLMS[2] / srcLMS[2]]
+        ]
+
+        let temp = multiplyMat(scale, b: bradfordM)
+        let result = multiplyMat(bradfordMInv, b: temp)
+        return result
+    }
+
+    private nonisolated func multiplyMatVec(_ mat: [[Double]], vec: [Double]) -> [Double] {
+        var result = [Double](repeating: 0, count: 3)
+        for i in 0..<3 {
+            for j in 0..<3 {
+                result[i] += mat[i][j] * vec[j]
+            }
+        }
+        return result
+    }
+
+    private nonisolated func multiplyMat(_ a: [[Double]], b: [[Double]]) -> [[Double]] {
+        var result = [[Double]](repeating: [Double](repeating: 0, count: 3), count: 3)
+        for i in 0..<3 {
+            for j in 0..<3 {
+                for k in 0..<3 {
+                    result[i][j] += a[i][k] * b[k][j]
+                }
+            }
+        }
+        return result
+    }
+
+    private nonisolated func applyBradfordCorrection(r: Double, g: Double, b: Double, matrix: [[Double]]) -> (Double, Double, Double) {
+        func linearize(_ c: Double) -> Double {
+            c > 0.04045 ? pow((c + 0.055) / 1.055, 2.4) : c / 12.92
+        }
+        func delinearize(_ c: Double) -> Double {
+            c > 0.0031308 ? 1.055 * pow(c, 1.0 / 2.4) - 0.055 : 12.92 * c
+        }
+
+        let rl = linearize(r)
+        let gl = linearize(g)
+        let bl = linearize(b)
+
+        let toXYZ: [[Double]] = [
+            [0.4124564, 0.3575761, 0.1804375],
+            [0.2126729, 0.7151522, 0.0721750],
+            [0.0193339, 0.1191920, 0.9503041]
+        ]
+        let fromXYZ: [[Double]] = [
+            [3.2404542, -1.5371385, -0.4985314],
+            [-0.9692660, 1.8760108,  0.0415560],
+            [0.0556434, -0.2040259,  1.0572252]
+        ]
+
+        let xyz = multiplyMatVec(toXYZ, vec: [rl, gl, bl])
+        let adaptedXYZ = multiplyMatVec(matrix, vec: xyz)
+        let rgb = multiplyMatVec(fromXYZ, vec: adaptedXYZ)
+
+        let cr = max(0, min(1, delinearize(max(0, rgb[0]))))
+        let cg = max(0, min(1, delinearize(max(0, rgb[1]))))
+        let cb = max(0, min(1, delinearize(max(0, rgb[2]))))
+
+        return (cr, cg, cb)
     }
 
     private func computeHighFreqLaplacianEnergy(ptr: UnsafePointer<UInt8>, width: Int, height: Int, bytesPerRow: Int, bytesPerPixel: Int, dataLength: Int) -> Double {

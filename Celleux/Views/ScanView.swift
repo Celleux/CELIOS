@@ -319,6 +319,9 @@ struct ScanView: View {
                         },
                         onAllCapturesFailed: {
                             viewModel.onAllCapturesFailed()
+                        },
+                        onLightingUpdated: { conditions in
+                            viewModel.onLightingUpdated(conditions)
                         }
                     )
                 } else {

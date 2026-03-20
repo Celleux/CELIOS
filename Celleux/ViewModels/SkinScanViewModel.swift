@@ -26,6 +26,7 @@ final class SkinScanViewModel {
     var scanError: String?
     var latestRegionScores: [String: RegionScores] = [:]
     var blendShapeElasticity: Double?
+    var currentLightingConditions: LightingConditions?
 
     private let analysisService = SkinAnalysisService()
 
@@ -197,6 +198,16 @@ final class SkinScanViewModel {
         blendShapeElasticity = score
     }
 
+    func onLightingUpdated(_ conditions: LightingConditions) {
+        currentLightingConditions = conditions
+        lightingQuality = conditions.qualityLevel
+        if conditions.qualityLevel == .poor {
+            guidanceText = "Find better lighting"
+        } else if isFaceDetected {
+            guidanceText = "Face detected \u{2014} ready to scan"
+        }
+    }
+
     func beginScan(modelContext: ModelContext) {
         guard !isScanning else { return }
         isScanning = true
@@ -207,6 +218,7 @@ final class SkinScanViewModel {
         captureFailed = false
         scanError = nil
         blendShapeElasticity = nil
+        currentLightingConditions = nil
         analysisStatusText = "Initializing scan..."
         analysisDetailText = "CALIBRATING SENSORS"
 
@@ -229,7 +241,7 @@ final class SkinScanViewModel {
 
             var analysis: SkinAnalysisData?
             for buffer in capturedPixelBuffers.reversed() {
-                if let result = await analysisService.analyze(pixelBuffer: buffer, blendShapeElasticity: blendShapeElasticity) {
+                if let result = await analysisService.analyze(pixelBuffer: buffer, blendShapeElasticity: blendShapeElasticity, lightingConditions: currentLightingConditions) {
                     analysis = result
                     break
                 }
@@ -270,7 +282,10 @@ final class SkinScanViewModel {
             aStarMean: analysis.aStarMean,
             bStarMean: analysis.bStarMean,
             laplacianVariance: analysis.laplacianVariance,
-            saturationVariance: analysis.saturationVariance
+            saturationVariance: analysis.saturationVariance,
+            lightingAmbientIntensity: analysis.lightingConditions?.ambientIntensity ?? 0,
+            lightingColorTemperature: analysis.lightingConditions?.colorTemperature ?? 0,
+            lightingCorrectionApplied: analysis.lightingConditions?.correctionApplied ?? false
         )
 
         let regionNames = ["Forehead", "Left Cheek", "Right Cheek", "Chin", "Under-Eyes", "Nose"]
@@ -337,6 +352,7 @@ final class SkinScanViewModel {
         captureFailed = false
         scanError = nil
         blendShapeElasticity = nil
+        currentLightingConditions = nil
         analysisStatusText = "Initializing scan..."
         analysisDetailText = "CALIBRATING SENSORS"
     }

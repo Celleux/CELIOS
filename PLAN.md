@@ -23,3 +23,13 @@ The retry thresholds `[0.8, 0.85, 0.9, 0.95]` are defined but the retry mechanis
 - The 6-region system is complete and working
 - All 10 metrics are implemented per region
 - Heat map already uses real region scores with smooth blending between regions
+
+## Lighting Normalization (Completed)
+
+### Changes Made
+1. [x] **LightingConditions struct** — Added to SkinScan.swift with ambientIntensity, colorTemperature, correctionApplied, quality level computation
+2. [x] **ARFaceTrackingView** — Reads ARLightEstimate.ambientIntensity and ambientColorTemperature every 0.5s, fires onLightingUpdated callback
+3. [x] **SkinScanViewModel** — Updates lightingQuality from real AR data; warns "Find better lighting" when intensity < 500 or > 2000 lumens
+4. [x] **Bradford chromatic adaptation** — Full implementation in SkinAnalysisService: color temp → XYZ white point → Bradford M matrix → adaptation matrix → RGB correction before L*a*b* conversion. Only applied when color temperature deviates > 1000K from D65 (6500K)
+5. [x] **SkinScanRecord** — Stores lightingAmbientIntensity, lightingColorTemperature, lightingCorrectionApplied per scan for comparison validity
+6. [x] **SkinAnalysisData** — Stores lightingConditions on analysis result

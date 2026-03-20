@@ -23,6 +23,10 @@ final class SkinScanRecord {
     var saturationVariance: Double
     var photoPath: String?
 
+    var lightingAmbientIntensity: Double
+    var lightingColorTemperature: Double
+    var lightingCorrectionApplied: Bool
+
     var foreheadTexture: Double
     var foreheadHydration: Double
     var foreheadBrightness: Double
@@ -80,6 +84,9 @@ final class SkinScanRecord {
         laplacianVariance: Double = 0,
         saturationVariance: Double = 0,
         photoPath: String? = nil,
+        lightingAmbientIntensity: Double = 0,
+        lightingColorTemperature: Double = 0,
+        lightingCorrectionApplied: Bool = false,
         foreheadTexture: Double = 0, foreheadHydration: Double = 0, foreheadBrightness: Double = 0, foreheadRedness: Double = 0, foreheadPores: Double = 0, foreheadTone: Double = 0, foreheadWrinkles: Double = 0,
         leftCheekTexture: Double = 0, leftCheekHydration: Double = 0, leftCheekBrightness: Double = 0, leftCheekRedness: Double = 0, leftCheekPores: Double = 0, leftCheekTone: Double = 0,
         rightCheekTexture: Double = 0, rightCheekHydration: Double = 0, rightCheekBrightness: Double = 0, rightCheekRedness: Double = 0, rightCheekPores: Double = 0, rightCheekTone: Double = 0,
@@ -104,6 +111,9 @@ final class SkinScanRecord {
         self.laplacianVariance = laplacianVariance
         self.saturationVariance = saturationVariance
         self.photoPath = photoPath
+        self.lightingAmbientIntensity = lightingAmbientIntensity
+        self.lightingColorTemperature = lightingColorTemperature
+        self.lightingCorrectionApplied = lightingCorrectionApplied
         self.foreheadTexture = foreheadTexture
         self.foreheadHydration = foreheadHydration
         self.foreheadBrightness = foreheadBrightness
