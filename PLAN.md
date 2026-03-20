@@ -1,47 +1,38 @@
-# Enhance Design System — Luxury Typography, Shadows, Springs, Spacing & Glassmorphism
+# Premium Tab Bar & Navigation System Upgrade
 
-**What's changing:** Upgrading the existing design system file with new luxury design tokens and enhanced glass card visuals, while removing all purple/violet colors.
+
+## What's Changing
+
+Upgrading the floating tab bar and navigation to a luxury jewelry-display aesthetic with richer animations, haptics, and quick-action shortcuts.
 
 ---
 
-### **1. Typography System**
-- Add a `CelleuxType` set of pre-built font styles: display (ultra-light 48pt), title (light 32pt), headline (regular 18pt), body (regular 16pt), caption (light 12pt), label (bold 8pt uppercase), and metric (thin 56pt)
-- All letter-spacing and line-spacing baked in — no weight heavier than semibold anywhere
+### **Features**
 
-### **2. Three-Tier Shadow System**
-- Add `CelleuxShadow` with three depth levels: tight (subtle close shadow), medium (card-level depth), and ambient (soft far shadow)
-- All three shadows automatically applied to every glass card for a realistic depth illusion
+- **Gold chrome border** on the tab bar — an animated angular gradient cycling silver → gold → silver around the edges
+- **Animated gold underline** slides beneath the active tab icon using smooth matched geometry
+- **Symbol bounce effect** on each tab icon when tapped
+- **Gold-tinted labels** when a tab is selected, using the luxury label typography style
+- **Long-press quick actions** — hold any tab to see a popover with shortcuts (e.g. last scan score, start ritual, quick scan)
+- **Staggered content appearance** — child views fade and slide in with a cascade delay when switching tabs
+- **Pull-to-refresh gold spinner** — a custom spinning gold ring replaces the default refresh indicator (on views that support it)
+- **Haptic feedback** on long-press and quick action selection
 
-### **3. Spring Animation Tokens**
-- Add `CelleuxSpring` with three named animations: luxury (slow & smooth), snappy (quick & controlled), bouncy (playful with overshoot)
-- Every transition in the app will use one of these — no linear or ease-in-out
+---
 
-### **4. Spacing Tokens**
-- Add `CelleuxSpacing` with six sizes: xs (4), sm (8), md (16), lg (24), xl (32), xxl (48)
-- Generous whitespace for that luxury feel
+### **Design**
 
-### **5. Enhanced Glass Cards**
-- Upgrade the existing `GlassCard` with a chrome angular-gradient border (silver → gold → silver rotating around the edge)
-- Add an inner white highlight glow at the top for a lit-from-above effect
-- Apply all three shadow tiers automatically
-- Optional subtle shimmer overlay (max 6% opacity)
-- Same upgrade for `CompactGlassCard`
+- Tab bar background: frosted white glass at 0.95 opacity with inner highlight gradient
+- 3-tier depth shadow (tight + medium + ambient) applied to the tab bar for a floating jewel-case look
+- Active tab icon tinted dark, inactive icons in soft silver
+- Gold underline indicator: 20pt wide, 2pt tall capsule with a subtle gold glow
+- Quick actions popover styled as a compact glass card with gold-accented icons
+- All animations use the luxury/snappy spring tokens — no linear or ease-in-out
+- Tab labels are uppercase with wide letter spacing (luxury label style)
 
-### **6. Haptic Tokens**
-- Add `CelleuxHaptic` with four named feedback styles: selection, impact, success, and soft tap
-- Ready-made view modifiers for consistent haptic feel across the app
+---
 
-### **7. Animated Number Modifier**
-- Add a `.animatedNumber` view modifier that applies a smooth numeric content transition with the luxury spring animation
-- For use on every score, percentage, and metric display
+### **Screens / Areas Affected**
 
-### **8. Color Cleanup**
-- **Remove** the purple `accent` and `accentLight` colors entirely
-- **Replace** the purple `dataViolet` and `dataVioletGradient` with gold-toned equivalents
-- **Update** two references in HomeView and SkinLongevityScoreView that use `dataViolet` to use the new gold data color
-- Convert any remaining non-P3 colors (like `background`, `cardSurface`, `textPrimary`) to Display P3
-- Verify every color uses `Color(.displayP3, ...)` — no sRGB
-
-### **What stays the same**
-- All existing components (LuxuryBezelRing, ChromeRingView, CelleuxMeshBackground, particles, button styles, etc.) remain intact and functional
-- Only enhanced with the new tokens where applicable
+- **Tab Bar (ContentView)** — upgraded floating bar with chrome border, gold underline, symbol bounce, long-press quick actions, 3-tier shadow, and staggered tab transitions
+- **Design System** — a new gold refresh spinner component and a quick-action popover card added as reusable pieces

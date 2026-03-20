@@ -1186,3 +1186,36 @@ struct BurstParticle {
     let opacity: Double
     let color: Color
 }
+
+struct GoldRefreshSpinner: View {
+    @State private var rotation: Double = 0
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(CelleuxColors.silverLight.opacity(0.3), lineWidth: 2)
+                .frame(width: 28, height: 28)
+
+            Circle()
+                .trim(from: 0, to: 0.65)
+                .stroke(
+                    AngularGradient(
+                        colors: [
+                            CelleuxColors.warmGold.opacity(0.1),
+                            CelleuxColors.warmGold,
+                            CelleuxColors.champagneGold.opacity(0.8)
+                        ],
+                        center: .center
+                    ),
+                    style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
+                )
+                .frame(width: 28, height: 28)
+                .rotationEffect(.degrees(rotation))
+        }
+        .onAppear {
+            withAnimation(.linear(duration: 1.0).repeatForever(autoreverses: false)) {
+                rotation = 360
+            }
+        }
+    }
+}
