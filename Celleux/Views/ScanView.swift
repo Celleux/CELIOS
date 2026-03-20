@@ -316,6 +316,9 @@ struct ScanView: View {
                         },
                         onElasticityComputed: { score in
                             viewModel.onElasticityComputed(score)
+                        },
+                        onAllCapturesFailed: {
+                            viewModel.onAllCapturesFailed()
                         }
                     )
                 } else {

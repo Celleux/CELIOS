@@ -14,6 +14,8 @@ final class SkinScanViewModel {
     var showMetricsExpanded: Bool = false
     var selectedHistoryItem: SkinScanResult?
     var capturedPixelBuffer: CVPixelBuffer?
+    var capturedPixelBuffers: [CVPixelBuffer] = []
+    var captureFailed: Bool = false
     var guidanceText: String = "Position your face in the frame"
     var isFaceDetected: Bool = false
     var analysisStatusText: String = "Initializing scan..."
@@ -23,6 +25,7 @@ final class SkinScanViewModel {
     var selectedTimeframe: ProgressTimeframe = .thirtyDays
     var scanError: String?
     var latestRegionScores: [String: RegionScores] = [:]
+    var blendShapeElasticity: Double?
 
     private let analysisService = SkinAnalysisService()
 
@@ -183,6 +186,15 @@ final class SkinScanViewModel {
 
     func onFrameCaptured(_ pixelBuffer: CVPixelBuffer) {
         capturedPixelBuffer = pixelBuffer
+        capturedPixelBuffers.append(pixelBuffer)
+    }
+
+    func onAllCapturesFailed() {
+        captureFailed = true
+    }
+
+    func onElasticityComputed(_ score: Double) {
+        blendShapeElasticity = score
     }
 
     func beginScan(modelContext: ModelContext) {
@@ -191,6 +203,8 @@ final class SkinScanViewModel {
         scanProgress = 0
         phase = .scanning
         capturedPixelBuffer = nil
+        capturedPixelBuffers = []
+        captureFailed = false
         scanError = nil
         blendShapeElasticity = nil
         analysisStatusText = "Initializing scan..."
@@ -206,14 +220,22 @@ final class SkinScanViewModel {
 
             phase = .analyzing
 
-            guard let buffer = capturedPixelBuffer else {
+            if capturedPixelBuffers.isEmpty {
                 scanError = "Unable to capture frame — please try again in better lighting"
                 isScanning = false
                 phase = .preScan
                 return
             }
 
-            guard let analysis = await analysisService.analyze(pixelBuffer: buffer) else {
+            var analysis: SkinAnalysisData?
+            for buffer in capturedPixelBuffers.reversed() {
+                if let result = await analysisService.analyze(pixelBuffer: buffer, blendShapeElasticity: blendShapeElasticity) {
+                    analysis = result
+                    break
+                }
+            }
+
+            guard let analysis else {
                 scanError = "Analysis failed — ensure your face is well-lit and centered"
                 isScanning = false
                 phase = .preScan
@@ -311,6 +333,8 @@ final class SkinScanViewModel {
         currentResult = nil
         isScanning = false
         capturedPixelBuffer = nil
+        capturedPixelBuffers = []
+        captureFailed = false
         scanError = nil
         blendShapeElasticity = nil
         analysisStatusText = "Initializing scan..."

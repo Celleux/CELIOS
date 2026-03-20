@@ -11,6 +11,7 @@ struct ARFaceTrackingView: UIViewRepresentable {
     var onFaceDetected: ((Bool) -> Void)?
     var onFrameCaptured: ((CVPixelBuffer) -> Void)?
     var onElasticityComputed: ((Double) -> Void)?
+    var onAllCapturesFailed: (() -> Void)?
 
     func makeUIView(context: Context) -> ARSCNView {
         let sceneView = ARSCNView(frame: .zero)
@@ -40,6 +41,7 @@ struct ARFaceTrackingView: UIViewRepresentable {
         context.coordinator.onFaceDetected = onFaceDetected
         context.coordinator.onFrameCaptured = onFrameCaptured
         context.coordinator.onElasticityComputed = onElasticityComputed
+        context.coordinator.onAllCapturesFailed = onAllCapturesFailed
         context.coordinator.updateMeshAppearance()
     }
 
@@ -61,6 +63,7 @@ struct ARFaceTrackingView: UIViewRepresentable {
         var onFaceDetected: ((Bool) -> Void)?
         var onFrameCaptured: ((CVPixelBuffer) -> Void)?
         var onElasticityComputed: ((Double) -> Void)?
+        var onAllCapturesFailed: (() -> Void)?
 
         private var faceNode: SCNNode?
         private var blendShapeSamples: [(timestamp: TimeInterval, jawOpen: Double, cheekPuff: Double, mouthSmileL: Double, mouthSmileR: Double)] = []
@@ -149,13 +152,17 @@ struct ARFaceTrackingView: UIViewRepresentable {
 
         nonisolated func session(_ session: ARSession, didUpdate frame: ARFrame) {
             Task { @MainActor in
-                guard self.isScanning && !self.hasCapturedFrame else { return }
+                guard self.isScanning else { return }
+                guard self.captureRetryCount < self.captureThresholds.count else {
+                    if !self.hasCapturedFrame {
+                        self.hasCapturedFrame = true
+                        self.onAllCapturesFailed?()
+                    }
+                    return
+                }
 
-                let thresholdIndex = self.captureRetryCount
-                guard thresholdIndex < self.captureThresholds.count else { return }
-
-                if self.scanProgress >= self.captureThresholds[thresholdIndex] {
-                    self.hasCapturedFrame = true
+                if self.scanProgress >= self.captureThresholds[self.captureRetryCount] {
+                    self.captureRetryCount += 1
                     self.onFrameCaptured?(frame.capturedImage)
                 }
             }
