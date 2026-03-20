@@ -12,11 +12,19 @@ struct ScanResultsView: View {
     @State private var celebrationTrigger: Int = 0
     @State private var displayedScore: Int = 0
 
+    private var calibration: CalibrationResult? { result.calibration }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
                 scanCompleteHeader
+                if let cal = calibration, cal.isCalibrating {
+                    calibrationBanner(cal)
+                }
                 scoreHeroCard
+                if let cal = calibration, !cal.isCalibrating {
+                    confidenceBadge(cal)
+                }
                 regionBreakdown
                 metricsSection
                 comparisonPlaceholder
@@ -162,13 +170,23 @@ struct ScanResultsView: View {
                     CelebrationParticleBurst(isActive: celebrationTrigger > 0)
                 }
 
-                if result.trend != 0 {
+                if let cal = calibration, !cal.isCalibrating, let delta = cal.deltaFromBaseline, delta != 0 {
+                    HStack(spacing: 6) {
+                        Image(systemName: delta > 0 ? "arrow.up.right" : "arrow.down.right")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(delta > 0 ? Color(hex: "4CAF50") : Color(hex: "E53935"))
+
+                        Text(String(format: "%+.0f points vs your baseline", delta))
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(delta > 0 ? Color(hex: "4CAF50") : Color(hex: "E53935"))
+                    }
+                } else if result.trend != 0 {
                     HStack(spacing: 6) {
                         Image(systemName: result.trend > 0 ? "arrow.up.right" : "arrow.down.right")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(result.trend > 0 ? Color(hex: "4CAF50") : Color(hex: "E53935"))
 
-                        Text(String(format: "%+.1f%% vs last scan", result.trend))
+                        Text(String(format: "%+.1f vs last scan", result.trend))
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(result.trend > 0 ? Color(hex: "4CAF50") : Color(hex: "E53935"))
                     }
@@ -295,6 +313,12 @@ struct ScanResultsView: View {
                         }
                         .foregroundStyle(trend >= 0 ? Color(hex: "4CAF50") : Color(hex: "E53935"))
                     }
+
+                    if let cal = calibration,
+                       let metricType = SkinMetricType.allCases.first(where: { $0.rawValue == metric.name }),
+                       let confidence = cal.perMetricConfidence[metricType] {
+                        confidenceDot(confidence)
+                    }
                 }
 
                 GeometryReader { geo in
@@ -404,6 +428,124 @@ struct ScanResultsView: View {
             }
         }
         .staggeredAppear(appeared: appeared, delay: 0.5)
+    }
+
+    private func calibrationBanner(_ cal: CalibrationResult) -> some View {
+        GlassCard {
+            VStack(spacing: 12) {
+                HStack(spacing: 10) {
+                    Image(systemName: "gauge.with.dots.needle.33percent")
+                        .font(.system(size: 20, weight: .light))
+                        .foregroundStyle(CelleuxColors.warmGold)
+                        .symbolEffect(.variableColor.iterative, options: .repeating, isActive: true)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Establishing Your Personal Baseline")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(CelleuxColors.textPrimary)
+
+                        Text("\(cal.calibrationScansRemaining) more scan\(cal.calibrationScansRemaining == 1 ? "" : "s") to calibrate")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(CelleuxColors.textLabel)
+                    }
+
+                    Spacer()
+                }
+
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(CelleuxColors.silver.opacity(0.08))
+                            .frame(height: 4)
+
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors: [CelleuxColors.warmGold.opacity(0.6), CelleuxColors.warmGold],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(width: geo.size.width * CGFloat(cal.calibrationScanCount) / 3.0, height: 4)
+                    }
+                }
+                .frame(height: 4)
+
+                HStack(spacing: 0) {
+                    ForEach(0..<3, id: \.self) { i in
+                        HStack(spacing: 4) {
+                            Image(systemName: i < cal.calibrationScanCount ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(i < cal.calibrationScanCount ? CelleuxColors.warmGold : CelleuxColors.silver.opacity(0.3))
+                            Text("Scan \(i + 1)")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(i < cal.calibrationScanCount ? CelleuxColors.textPrimary : CelleuxColors.textLabel)
+                        }
+                        if i < 2 { Spacer() }
+                    }
+                }
+            }
+        }
+        .staggeredAppear(appeared: appeared, delay: 0.03)
+    }
+
+    private func confidenceBadge(_ cal: CalibrationResult) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: confidenceIcon(cal.overallConfidence))
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(confidenceColor(cal.overallConfidence))
+
+            Text("\(cal.overallConfidence.rawValue) Confidence")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(confidenceColor(cal.overallConfidence))
+
+            Spacer()
+
+            Text(confidenceExplanation(cal.overallConfidence))
+                .font(.system(size: 10, weight: .regular))
+                .foregroundStyle(CelleuxColors.textLabel)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            Capsule()
+                .fill(confidenceColor(cal.overallConfidence).opacity(0.06))
+        )
+        .overlay(
+            Capsule()
+                .stroke(confidenceColor(cal.overallConfidence).opacity(0.15), lineWidth: 0.5)
+        )
+        .staggeredAppear(appeared: appeared, delay: 0.08)
+    }
+
+    private func confidenceDot(_ level: ConfidenceLevel) -> some View {
+        Circle()
+            .fill(confidenceColor(level))
+            .frame(width: 6, height: 6)
+    }
+
+    private func confidenceColor(_ level: ConfidenceLevel) -> Color {
+        switch level {
+        case .low: Color(hex: "E8A838")
+        case .medium: Color(hex: "4A90D9")
+        case .high: Color(hex: "4CAF50")
+        }
+    }
+
+    private func confidenceIcon(_ level: ConfidenceLevel) -> String {
+        switch level {
+        case .low: "circle.bottomhalf.filled"
+        case .medium: "circle.lefthalf.filled"
+        case .high: "checkmark.circle.fill"
+        }
+    }
+
+    private func confidenceExplanation(_ level: ConfidenceLevel) -> String {
+        switch level {
+        case .low: "< 3 scans"
+        case .medium: "3-10 scans"
+        case .high: "10+ consistent"
+        }
     }
 
     private var disclaimerText: some View {

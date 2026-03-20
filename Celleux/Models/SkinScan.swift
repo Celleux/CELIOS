@@ -250,14 +250,16 @@ struct SkinScanResult: Identifiable {
     let metrics: [SkinMetric]
     let trend: Double
     let analysisData: SkinAnalysisData?
+    let calibration: CalibrationResult?
 
-    init(date: Date, overallScore: Int, regions: [SkinRegionResult], metrics: [SkinMetric], trend: Double, analysisData: SkinAnalysisData? = nil) {
+    init(date: Date, overallScore: Int, regions: [SkinRegionResult], metrics: [SkinMetric], trend: Double, analysisData: SkinAnalysisData? = nil, calibration: CalibrationResult? = nil) {
         self.date = date
         self.overallScore = overallScore
         self.regions = regions
         self.metrics = metrics
         self.trend = trend
         self.analysisData = analysisData
+        self.calibration = calibration
     }
 
     var dateString: String {

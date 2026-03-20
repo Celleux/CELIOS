@@ -33,6 +33,7 @@ struct CelleuxApp: App {
             SkinScanRecord.self,
             DailyCheckIn.self,
             AchievementRecord.self,
+            CalibrationBaseline.self,
         ])
     }
 }

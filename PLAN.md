@@ -33,3 +33,13 @@ The retry thresholds `[0.8, 0.85, 0.9, 0.95]` are defined but the retry mechanis
 4. [x] **Bradford chromatic adaptation** — Full implementation in SkinAnalysisService: color temp → XYZ white point → Bradford M matrix → adaptation matrix → RGB correction before L*a*b* conversion. Only applied when color temperature deviates > 1000K from D65 (6500K)
 5. [x] **SkinScanRecord** — Stores lightingAmbientIntensity, lightingColorTemperature, lightingCorrectionApplied per scan for comparison validity
 6. [x] **SkinAnalysisData** — Stores lightingConditions on analysis result
+
+## Calibration System (Completed)
+
+### Changes Made
+1. [x] **CalibrationBaseline model** — SwiftData @Model with per-region L*, a*, b* means, texture variance, saturation variance, plus per-metric baseline scores
+2. [x] **CalibrationService** — First 3 scans = calibration phase with running averages; after calibration reports delta from baseline with 3-point minimum detectable change; trend requires 3+ consistent scans
+3. [x] **Confidence indicators** — Low (< 3 scans), Medium (3-10 scans, consistent lighting), High (10+ scans, consistent lighting). Per-metric and overall confidence computed from scan count + lighting consistency (coefficient of variation < 0.3)
+4. [x] **SkinScanViewModel integration** — Calls CalibrationService.processCalibration after each scan, stores CalibrationResult on SkinScanResult
+5. [x] **CalibrationBaseline registered in modelContainer** — Added to CelleuxApp.swift
+6. [x] **ScanResultsView UI** — Calibration banner during first 3 scans (progress bar + scan checkmarks), delta from baseline display ("X points vs your baseline"), confidence badge (Low/Medium/High with color-coded dot per metric)

@@ -27,8 +27,12 @@ final class SkinScanViewModel {
     var latestRegionScores: [String: RegionScores] = [:]
     var blendShapeElasticity: Double?
     var currentLightingConditions: LightingConditions?
+    var calibrationResult: CalibrationResult?
+    var isCalibrating: Bool = false
+    var calibrationScansRemaining: Int = 3
 
     private let analysisService = SkinAnalysisService()
+    private let calibrationService = CalibrationService()
 
     private let scanPhases: [(range: ClosedRange<Double>, status: String, detail: String)] = [
         (0.0...0.12, "Mapping facial geometry...", "DETECTING FACE MESH"),
@@ -255,10 +259,16 @@ final class SkinScanViewModel {
             }
 
             latestRegionScores = analysis.regionData
-            let result = buildResult(from: analysis)
+            saveToSwiftData(analysis: analysis, modelContext: modelContext)
+
+            let calResult = calibrationService.processCalibration(analysis: analysis, modelContext: modelContext)
+            calibrationResult = calResult
+            isCalibrating = calResult.isCalibrating
+            calibrationScansRemaining = calResult.calibrationScansRemaining
+
+            let result = buildResult(from: analysis, calibration: calResult)
             currentResult = result
             scanHistory.insert(result, at: 0)
-            saveToSwiftData(analysis: analysis, modelContext: modelContext)
 
             isScanning = false
             phase = .results
@@ -266,6 +276,10 @@ final class SkinScanViewModel {
     }
 
     private func saveToSwiftData(analysis: SkinAnalysisData, modelContext: ModelContext) {
+        let scanDescriptor = FetchDescriptor<SkinScanRecord>()
+        let existingScanCount = (try? modelContext.fetchCount(scanDescriptor)) ?? 0
+        let isCal = existingScanCount < 3
+
         let record = SkinScanRecord(
             date: Date(),
             overallScore: Int(analysis.overallScore.rounded()),
@@ -285,7 +299,10 @@ final class SkinScanViewModel {
             saturationVariance: analysis.saturationVariance,
             lightingAmbientIntensity: analysis.lightingConditions?.ambientIntensity ?? 0,
             lightingColorTemperature: analysis.lightingConditions?.colorTemperature ?? 0,
-            lightingCorrectionApplied: analysis.lightingConditions?.correctionApplied ?? false
+            lightingCorrectionApplied: analysis.lightingConditions?.correctionApplied ?? false,
+            isCalibrationPhase: isCal,
+            confidenceLevel: isCal ? ConfidenceLevel.low.rawValue : ConfidenceLevel.medium.rawValue,
+            deltaFromBaseline: 0
         )
 
         let regionNames = ["Forehead", "Left Cheek", "Right Cheek", "Chin", "Under-Eyes", "Nose"]
@@ -375,7 +392,7 @@ final class SkinScanViewModel {
         phase = .preScan
     }
 
-    private func buildResult(from analysis: SkinAnalysisData) -> SkinScanResult {
+    private func buildResult(from analysis: SkinAnalysisData, calibration: CalibrationResult? = nil) -> SkinScanResult {
         let overallScore = Int(analysis.overallScore.rounded())
         let prevResult = scanHistory.first
 
@@ -436,7 +453,8 @@ final class SkinScanViewModel {
             regions: regions,
             metrics: metrics,
             trend: trend,
-            analysisData: analysis
+            analysisData: analysis,
+            calibration: calibration
         )
     }
 }

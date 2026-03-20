@@ -27,6 +27,10 @@ final class SkinScanRecord {
     var lightingColorTemperature: Double
     var lightingCorrectionApplied: Bool
 
+    var isCalibrationPhase: Bool
+    var confidenceLevel: String
+    var deltaFromBaseline: Double
+
     var foreheadTexture: Double
     var foreheadHydration: Double
     var foreheadBrightness: Double
@@ -87,6 +91,9 @@ final class SkinScanRecord {
         lightingAmbientIntensity: Double = 0,
         lightingColorTemperature: Double = 0,
         lightingCorrectionApplied: Bool = false,
+        isCalibrationPhase: Bool = false,
+        confidenceLevel: String = "Low",
+        deltaFromBaseline: Double = 0,
         foreheadTexture: Double = 0, foreheadHydration: Double = 0, foreheadBrightness: Double = 0, foreheadRedness: Double = 0, foreheadPores: Double = 0, foreheadTone: Double = 0, foreheadWrinkles: Double = 0,
         leftCheekTexture: Double = 0, leftCheekHydration: Double = 0, leftCheekBrightness: Double = 0, leftCheekRedness: Double = 0, leftCheekPores: Double = 0, leftCheekTone: Double = 0,
         rightCheekTexture: Double = 0, rightCheekHydration: Double = 0, rightCheekBrightness: Double = 0, rightCheekRedness: Double = 0, rightCheekPores: Double = 0, rightCheekTone: Double = 0,
@@ -114,6 +121,9 @@ final class SkinScanRecord {
         self.lightingAmbientIntensity = lightingAmbientIntensity
         self.lightingColorTemperature = lightingColorTemperature
         self.lightingCorrectionApplied = lightingCorrectionApplied
+        self.isCalibrationPhase = isCalibrationPhase
+        self.confidenceLevel = confidenceLevel
+        self.deltaFromBaseline = deltaFromBaseline
         self.foreheadTexture = foreheadTexture
         self.foreheadHydration = foreheadHydration
         self.foreheadBrightness = foreheadBrightness
