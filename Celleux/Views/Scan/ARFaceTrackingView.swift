@@ -10,6 +10,7 @@ struct ARFaceTrackingView: UIViewRepresentable {
     let regionScores: [String: RegionScores]
     var onFaceDetected: ((Bool) -> Void)?
     var onFrameCaptured: ((CVPixelBuffer) -> Void)?
+    var onElasticityComputed: ((Double) -> Void)?
 
     func makeUIView(context: Context) -> ARSCNView {
         let sceneView = ARSCNView(frame: .zero)
@@ -38,6 +39,7 @@ struct ARFaceTrackingView: UIViewRepresentable {
         context.coordinator.regionScores = regionScores
         context.coordinator.onFaceDetected = onFaceDetected
         context.coordinator.onFrameCaptured = onFrameCaptured
+        context.coordinator.onElasticityComputed = onElasticityComputed
         context.coordinator.updateMeshAppearance()
     }
 
@@ -58,8 +60,18 @@ struct ARFaceTrackingView: UIViewRepresentable {
         var regionScores: [String: RegionScores] = [:]
         var onFaceDetected: ((Bool) -> Void)?
         var onFrameCaptured: ((CVPixelBuffer) -> Void)?
+        var onElasticityComputed: ((Double) -> Void)?
 
         private var faceNode: SCNNode?
+        private var blendShapeSamples: [(timestamp: TimeInterval, jawOpen: Double, cheekPuff: Double, mouthSmileL: Double, mouthSmileR: Double)] = []
+        private var elasticityPhase: ElasticityPhase = .idle
+        private var elasticityScore: Double = 0
+
+        enum ElasticityPhase {
+            case idle
+            case sampling
+            case computed
+        }
         private var faceGeometry: ARSCNFaceGeometry?
         private var heatMapNode: SCNNode?
         private var scanBeamNode: SCNNode?
@@ -110,7 +122,15 @@ struct ARFaceTrackingView: UIViewRepresentable {
 
             faceGeometry.update(from: faceAnchor.geometry)
 
+            let blendShapes = faceAnchor.blendShapes
+            let jawOpen = blendShapes[.jawOpen]?.doubleValue ?? 0
+            let cheekPuff = blendShapes[.cheekPuff]?.doubleValue ?? 0
+            let smileL = blendShapes[.mouthSmileLeft]?.doubleValue ?? 0
+            let smileR = blendShapes[.mouthSmileRight]?.doubleValue ?? 0
+            let time = CACurrentMediaTime()
+
             Task { @MainActor in
+                self.sampleBlendShapes(timestamp: time, jawOpen: jawOpen, cheekPuff: cheekPuff, smileL: smileL, smileR: smileR)
                 self.updateHeatMapGeometry(faceAnchor: faceAnchor, node: node)
                 self.updateMeshReveal(faceAnchor: faceAnchor, node: node)
             }
@@ -184,11 +204,72 @@ struct ARFaceTrackingView: UIViewRepresentable {
                 meshRevealNode = nil
                 hasCapturedFrame = false
                 captureRetryCount = 0
+                blendShapeSamples.removeAll()
+                elasticityPhase = .idle
+                elasticityScore = 0
 
                 for particle in orbitParticles {
                     particle.isHidden = true
                 }
             }
+        }
+
+        private func sampleBlendShapes(timestamp: TimeInterval, jawOpen: Double, cheekPuff: Double, smileL: Double, smileR: Double) {
+            guard isScanning, elasticityPhase != .computed else { return }
+
+            if elasticityPhase == .idle && scanProgress > 0.1 {
+                elasticityPhase = .sampling
+            }
+
+            guard elasticityPhase == .sampling else { return }
+
+            blendShapeSamples.append((timestamp: timestamp, jawOpen: jawOpen, cheekPuff: cheekPuff, mouthSmileL: smileL, mouthSmileR: smileR))
+
+            if blendShapeSamples.count >= 30 && scanProgress > 0.6 {
+                elasticityScore = computeElasticityFromSamples()
+                elasticityPhase = .computed
+                onElasticityComputed?(elasticityScore)
+            }
+        }
+
+        private func computeElasticityFromSamples() -> Double {
+            guard blendShapeSamples.count >= 10 else { return 75 }
+
+            var smileSymmetryValues: [Double] = []
+            var jawVariability: [Double] = []
+            var cheekResponsiveness: [Double] = []
+
+            for sample in blendShapeSamples {
+                let symmetry = 1.0 - abs(sample.mouthSmileL - sample.mouthSmileR)
+                smileSymmetryValues.append(symmetry)
+                jawVariability.append(sample.jawOpen)
+                cheekResponsiveness.append(sample.cheekPuff)
+            }
+
+            let avgSymmetry = smileSymmetryValues.reduce(0, +) / Double(smileSymmetryValues.count)
+
+            let jawMean = jawVariability.reduce(0, +) / Double(jawVariability.count)
+            let jawRange = (jawVariability.max() ?? 0) - (jawVariability.min() ?? 0)
+
+            let cheekMean = cheekResponsiveness.reduce(0, +) / Double(cheekResponsiveness.count)
+
+            var recoverySpeed: Double = 0.5
+            for i in 1..<blendShapeSamples.count {
+                let prev = blendShapeSamples[i - 1]
+                let curr = blendShapeSamples[i]
+                let dt = curr.timestamp - prev.timestamp
+                guard dt > 0 else { continue }
+                let jawDelta = abs(curr.jawOpen - prev.jawOpen) / dt
+                recoverySpeed = max(recoverySpeed, min(1.0, jawDelta / 5.0))
+            }
+
+            let symmetryComponent = avgSymmetry * 30.0
+            let rangeComponent = min(1.0, jawRange / 0.3) * 25.0
+            let recoveryComponent = recoverySpeed * 25.0
+            let baselineComponent = min(1.0, (cheekMean + jawMean) / 0.2) * 20.0
+
+            let rawScore = symmetryComponent + rangeComponent + recoveryComponent + baselineComponent
+            return max(25, min(98, rawScore))
         }
 
         private func addFuturisticMeshOverlay(to node: SCNNode, device: MTLDevice) {

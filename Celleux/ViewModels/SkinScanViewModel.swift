@@ -192,6 +192,7 @@ final class SkinScanViewModel {
         phase = .scanning
         capturedPixelBuffer = nil
         scanError = nil
+        blendShapeElasticity = nil
         analysisStatusText = "Initializing scan..."
         analysisDetailText = "CALIBRATING SENSORS"
 
@@ -311,6 +312,7 @@ final class SkinScanViewModel {
         isScanning = false
         capturedPixelBuffer = nil
         scanError = nil
+        blendShapeElasticity = nil
         analysisStatusText = "Initializing scan..."
         analysisDetailText = "CALIBRATING SENSORS"
     }

@@ -313,6 +313,9 @@ struct ScanView: View {
                         },
                         onFrameCaptured: { buffer in
                             viewModel.onFrameCaptured(buffer)
+                        },
+                        onElasticityComputed: { score in
+                            viewModel.onElasticityComputed(score)
                         }
                     )
                 } else {

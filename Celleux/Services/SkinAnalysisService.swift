@@ -5,7 +5,7 @@ import Accelerate
 
 nonisolated class SkinAnalysisService: Sendable {
 
-    func analyze(pixelBuffer: CVPixelBuffer) async -> SkinAnalysisData? {
+    func analyze(pixelBuffer: CVPixelBuffer, blendShapeElasticity: Double? = nil) async -> SkinAnalysisData? {
         let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
         let context = CIContext()
 
@@ -16,7 +16,7 @@ nonisolated class SkinAnalysisService: Sendable {
         let namedRegions = await detectNamedFaceRegions(in: cgImage)
 
         guard !namedRegions.isEmpty else {
-            return analyzeFullImage(cgImage: cgImage, context: context)
+            return analyzeFullImage(cgImage: cgImage, context: context, blendShapeElasticity: blendShapeElasticity)
         }
 
         var regionData: [String: RegionScores] = [:]
@@ -27,6 +27,8 @@ nonisolated class SkinAnalysisService: Sendable {
         var allBStar: [Double] = []
         var allMeanL: [Double] = []
         var allHFEnergy: [Double] = []
+        var allGaborEnergy: [Double] = []
+        var regionMeanLMap: [String: Double] = [:]
 
         for (name, rect) in namedRegions {
             guard let cropped = cgImage.cropping(to: rect),
@@ -37,6 +39,7 @@ nonisolated class SkinAnalysisService: Sendable {
             let bScore = mapITAToScore(metrics.ita)
             let rScore = mapRednessToScore(metrics.redness)
             let pScore = mapPoreVisibilityToScore(metrics.highFreqLaplacianEnergy)
+            let wScore = mapWrinkleDepthToScore(metrics.gaborEnergy)
 
             regionData[name] = RegionScores(
                 textureEvennessScore: tScore,
@@ -44,6 +47,7 @@ nonisolated class SkinAnalysisService: Sendable {
                 brightnessRadianceScore: bScore,
                 rednessScore: rScore,
                 poreVisibilityScore: pScore,
+                wrinkleDepthScore: wScore,
                 itaAngle: metrics.ita,
                 aStarMean: metrics.redness,
                 bStarMean: metrics.bStar,
@@ -58,6 +62,8 @@ nonisolated class SkinAnalysisService: Sendable {
             allBStar.append(metrics.bStar)
             allMeanL.append(metrics.meanL)
             allHFEnergy.append(metrics.highFreqLaplacianEnergy)
+            allGaborEnergy.append(metrics.gaborEnergy)
+            regionMeanLMap[name] = metrics.meanL
         }
 
         guard !allITA.isEmpty else {
@@ -71,13 +77,36 @@ nonisolated class SkinAnalysisService: Sendable {
         let avgSatVar = allSaturationVar.reduce(0, +) / count
         let avgBStar = allBStar.reduce(0, +) / count
         let avgHFEnergy = allHFEnergy.reduce(0, +) / count
+        let avgGaborEnergy = allGaborEnergy.reduce(0, +) / count
 
         let lStarMean = allMeanL.reduce(0, +) / count
         let lStarStdDev = sqrt(allMeanL.reduce(0) { $0 + ($1 - lStarMean) * ($1 - lStarMean) } / count)
         let toneUniformityScore = mapToneUniformityToScore(lStarStdDev)
 
+        let underEyeLStar = regionMeanLMap["Under-Eyes"]
+        let leftCheekL = regionMeanLMap["Left Cheek"]
+        let rightCheekL = regionMeanLMap["Right Cheek"]
+        var underEyeQualityScore: Double = 0
+        if let eyeL = underEyeLStar {
+            let cheekL: Double
+            if let lL = leftCheekL, let rL = rightCheekL {
+                cheekL = (lL + rL) / 2.0
+            } else if let lL = leftCheekL {
+                cheekL = lL
+            } else if let rL = rightCheekL {
+                cheekL = rL
+            } else {
+                cheekL = eyeL
+            }
+            let deltaL = abs(eyeL - cheekL)
+            underEyeQualityScore = mapUnderEyeQualityToScore(deltaL)
+        }
+
         for (name, var scores) in regionData {
             scores.toneUniformityScore = toneUniformityScore
+            if name == "Under-Eyes" {
+                scores.underEyeQualityScore = underEyeQualityScore
+            }
             regionData[name] = scores
         }
 
@@ -86,6 +115,8 @@ nonisolated class SkinAnalysisService: Sendable {
         let brightnessRadianceScore = mapITAToScore(avgITA)
         let rednessScore = mapRednessToScore(avgRedness)
         let poreVisibilityScore = mapPoreVisibilityToScore(avgHFEnergy)
+        let wrinkleDepthScore = mapWrinkleDepthToScore(avgGaborEnergy)
+        let elasticityProxyScore = blendShapeElasticity ?? 0
 
         var data = SkinAnalysisData(
             textureEvennessScore: textureEvennessScore,
@@ -94,6 +125,9 @@ nonisolated class SkinAnalysisService: Sendable {
             rednessScore: rednessScore,
             poreVisibilityScore: poreVisibilityScore,
             toneUniformityScore: toneUniformityScore,
+            underEyeQualityScore: underEyeQualityScore,
+            wrinkleDepthScore: wrinkleDepthScore,
+            elasticityProxyScore: elasticityProxyScore,
             itaAngle: avgITA,
             aStarMean: avgRedness,
             bStarMean: avgBStar,
@@ -107,7 +141,7 @@ nonisolated class SkinAnalysisService: Sendable {
         return data
     }
 
-    private func analyzeFullImage(cgImage: CGImage, context: CIContext) -> SkinAnalysisData? {
+    private func analyzeFullImage(cgImage: CGImage, context: CIContext, blendShapeElasticity: Double? = nil) -> SkinAnalysisData? {
         let w = cgImage.width
         let h = cgImage.height
         let centerRect = CGRect(
@@ -127,6 +161,7 @@ nonisolated class SkinAnalysisService: Sendable {
         let rednessScore = mapRednessToScore(metrics.redness)
         let poreVisibilityScore = mapPoreVisibilityToScore(metrics.highFreqLaplacianEnergy)
         let toneUniformityScore = mapToneUniformityToScore(0)
+        let wrinkleDepthScore = mapWrinkleDepthToScore(metrics.gaborEnergy)
 
         let scores = RegionScores(
             textureEvennessScore: textureEvennessScore,
@@ -134,7 +169,7 @@ nonisolated class SkinAnalysisService: Sendable {
             brightnessRadianceScore: brightnessRadianceScore,
             rednessScore: rednessScore,
             poreVisibilityScore: poreVisibilityScore,
-            toneUniformityScore: toneUniformityScore,
+            wrinkleDepthScore: wrinkleDepthScore,
             itaAngle: metrics.ita,
             aStarMean: metrics.redness,
             bStarMean: metrics.bStar,
@@ -158,6 +193,8 @@ nonisolated class SkinAnalysisService: Sendable {
             rednessScore: rednessScore,
             poreVisibilityScore: poreVisibilityScore,
             toneUniformityScore: toneUniformityScore,
+            wrinkleDepthScore: wrinkleDepthScore,
+            elasticityProxyScore: blendShapeElasticity ?? 0,
             itaAngle: metrics.ita,
             aStarMean: metrics.redness,
             bStarMean: metrics.bStar,
@@ -271,6 +308,7 @@ nonisolated class SkinAnalysisService: Sendable {
         let saturationVariance: Double
         let meanL: Double
         let highFreqLaplacianEnergy: Double
+        let gaborEnergy: Double
     }
 
     private func computeRegionMetrics(cgImage: CGImage, context: CIContext) -> InternalRegionMetrics? {
@@ -334,6 +372,7 @@ nonisolated class SkinAnalysisService: Sendable {
         let dataLength = CFDataGetLength(data)
         let textureVar = computeTextureVariance(ptr: ptr, width: width, height: height, bytesPerRow: bytesPerRow, bytesPerPixel: bytesPerPixel, dataLength: dataLength)
         let hfEnergy = computeHighFreqLaplacianEnergy(ptr: ptr, width: width, height: height, bytesPerRow: bytesPerRow, bytesPerPixel: bytesPerPixel, dataLength: dataLength)
+        let gabor = computeGaborFilterEnergy(ptr: ptr, width: width, height: height, bytesPerRow: bytesPerRow, bytesPerPixel: bytesPerPixel, dataLength: dataLength)
 
         return InternalRegionMetrics(
             ita: ita,
@@ -342,7 +381,8 @@ nonisolated class SkinAnalysisService: Sendable {
             texture: textureVar,
             saturationVariance: satVar,
             meanL: meanL,
-            highFreqLaplacianEnergy: hfEnergy
+            highFreqLaplacianEnergy: hfEnergy,
+            gaborEnergy: gabor
         )
     }
 
@@ -447,6 +487,70 @@ nonisolated class SkinAnalysisService: Sendable {
         if lStarStdDev < 5 { return 75 + (5 - lStarStdDev) * (17.0 / 3.0) }
         if lStarStdDev < 10 { return 55 + (10 - lStarStdDev) * (20.0 / 5.0) }
         return max(25, 55 - (lStarStdDev - 10) * 2)
+    }
+
+    private func mapUnderEyeQualityToScore(_ deltaL: Double) -> Double {
+        if deltaL < 2 { return min(98, 92 + (2 - deltaL) * 3) }
+        if deltaL < 5 { return 78 + (5 - deltaL) * (14.0 / 3.0) }
+        if deltaL < 10 { return 55 + (10 - deltaL) * (23.0 / 5.0) }
+        return max(25, 55 - (deltaL - 10) * 2.5)
+    }
+
+    private func mapWrinkleDepthToScore(_ gaborEnergy: Double) -> Double {
+        if gaborEnergy < 30 { return min(98, 90 + (30 - gaborEnergy) * 0.27) }
+        if gaborEnergy < 100 { return 72 + (100 - gaborEnergy) * (18.0 / 70.0) }
+        if gaborEnergy < 300 { return 50 + (300 - gaborEnergy) * (22.0 / 200.0) }
+        return max(25, 50 - (gaborEnergy - 300) * 0.06)
+    }
+
+    private func computeGaborFilterEnergy(ptr: UnsafePointer<UInt8>, width: Int, height: Int, bytesPerRow: Int, bytesPerPixel: Int, dataLength: Int) -> Double {
+        var totalEnergy: Double = 0
+        var sampleCount = 0
+
+        let orientations: [(kx: Double, ky: Double)] = [
+            (1.0, 0.0),
+            (0.0, 1.0),
+            (0.707, 0.707),
+            (-0.707, 0.707)
+        ]
+
+        let frequency = 0.15
+        let sigma = 3.0
+        let kernelRadius = 4
+        let step = max(1, min(width, height) / 40)
+
+        for y in stride(from: kernelRadius, to: height - kernelRadius, by: step) {
+            for x in stride(from: kernelRadius, to: width - kernelRadius, by: step) {
+                var maxResponse: Double = 0
+
+                for orient in orientations {
+                    var response: Double = 0
+
+                    for ky in -kernelRadius...kernelRadius {
+                        for kx in -kernelRadius...kernelRadius {
+                            let gray = grayAt(ptr, x: x + kx, y: y + ky, bytesPerRow: bytesPerRow, bpp: bytesPerPixel, dataLength: dataLength)
+                            guard gray >= 0 else { continue }
+
+                            let xPrime = Double(kx) * orient.kx + Double(ky) * orient.ky
+                            let dist2 = Double(kx * kx + ky * ky)
+                            let gaussian = exp(-dist2 / (2.0 * sigma * sigma))
+                            let sinusoidal = cos(2.0 * .pi * frequency * xPrime)
+                            let kernel = gaussian * sinusoidal
+
+                            response += gray * kernel
+                        }
+                    }
+
+                    maxResponse = max(maxResponse, response * response)
+                }
+
+                totalEnergy += maxResponse
+                sampleCount += 1
+            }
+        }
+
+        guard sampleCount > 0 else { return 100 }
+        return totalEnergy / Double(sampleCount)
     }
 
     private func computeHighFreqLaplacianEnergy(ptr: UnsafePointer<UInt8>, width: Int, height: Int, bytesPerRow: Int, bytesPerPixel: Int, dataLength: Int) -> Double {
