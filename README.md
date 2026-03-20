@@ -1,2 +1,0 @@
-# CELIOS
-Created by Rork
