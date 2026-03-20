@@ -11,6 +11,20 @@ struct ScanView: View {
     @State private var scanHapticMilestone: Int = 0
     @State private var showFlash: Bool = false
     @State private var celebrationBurst: Bool = false
+    @State private var faceGuidePulse: Bool = false
+    @State private var analysisMetricIndex: Int = 0
+
+    private let analysisMetricNames: [String] = [
+        "Texture Evenness",
+        "Apparent Hydration",
+        "Brightness & Radiance",
+        "Redness Detection",
+        "Pore Visibility",
+        "Tone Uniformity",
+        "Under-Eye Analysis",
+        "Wrinkle Mapping",
+        "Elasticity Proxy"
+    ]
 
     var body: some View {
         NavigationStack {
@@ -208,6 +222,8 @@ struct ScanView: View {
         }
     }
 
+    // MARK: - Pre-Scan
+
     private var preScanContent: some View {
         ZStack {
             CelleuxMeshBackground()
@@ -215,13 +231,297 @@ struct ScanView: View {
             VStack(spacing: 0) {
                 cameraContainer(isScanning: false, showHeatMap: false)
                 Spacer(minLength: 16)
-                bottomControls
+                preScanBottomPanel
                     .padding(.bottom, 90)
             }
             .padding(.horizontal, 16)
             .padding(.top, 4)
         }
     }
+
+    private var preScanBottomPanel: some View {
+        VStack(spacing: 14) {
+            faceDetectionGuidance
+
+            HStack(spacing: 16) {
+                scanInfoItem(icon: "clock", value: "~8s", label: "Duration")
+                Rectangle().fill(LinearGradient(colors: [Color(hex: "D4C4A0").opacity(0.05), Color(hex: "C9A96E").opacity(0.15), Color(hex: "D4C4A0").opacity(0.05)], startPoint: .top, endPoint: .bottom)).frame(width: 1, height: 28)
+                scanInfoItem(icon: "lock.shield", value: "Private", label: "On-Device")
+                Rectangle().fill(LinearGradient(colors: [Color(hex: "D4C4A0").opacity(0.05), Color(hex: "C9A96E").opacity(0.15), Color(hex: "D4C4A0").opacity(0.05)], startPoint: .top, endPoint: .bottom)).frame(width: 1, height: 28)
+                scanInfoItem(icon: "chart.bar", value: "10", label: "Metrics")
+            }
+            .padding(.vertical, 14)
+            .padding(.horizontal, 20)
+            .background(premiumInfoBarBackground)
+
+            HStack(spacing: 10) {
+                Button {
+                    scanTrigger.toggle()
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
+                        viewModel.beginScan(modelContext: modelContext)
+                    }
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "faceid")
+                            .font(.system(size: 16, weight: .light))
+                        Text("Scan")
+                            .font(.system(size: 15, weight: .semibold))
+                            .tracking(0.3)
+                    }
+                    .foregroundStyle(CelleuxColors.textPrimary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                }
+                .buttonStyle(Premium3DButtonStyle())
+                .sensoryFeedback(.impact(flexibility: .rigid, intensity: 0.8), trigger: scanTrigger)
+
+                Button {
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
+                        viewModel.showHeatMapMode()
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "waveform.badge.magnifyingglass")
+                            .font(.system(size: 14, weight: .medium))
+                        Text("AR Map")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .foregroundStyle(Color(hex: "E8D6A8"))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .fill(Color(hex: "0A0A10"))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(Color(hex: "E8D6A8").opacity(0.3), lineWidth: 1)
+                    )
+                }
+                .shadow(color: Color(hex: "E8D6A8").opacity(0.15), radius: 10, x: 0, y: 4)
+            }
+
+            Text(viewModel.lastScanText)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(CelleuxColors.textLabel)
+        }
+    }
+
+    private var faceDetectionGuidance: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(viewModel.isFaceDetected ? Color(hex: "4CAF50").opacity(0.12) : Color(hex: "E8A838").opacity(0.12))
+                    .frame(width: 32, height: 32)
+                    .scaleEffect(faceGuidePulse ? 1.15 : 1.0)
+
+                Image(systemName: viewModel.isFaceDetected ? "face.smiling" : "viewfinder")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(viewModel.isFaceDetected ? Color(hex: "4CAF50") : Color(hex: "E8A838"))
+                    .symbolEffect(.bounce, value: viewModel.isFaceDetected)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(viewModel.guidanceText)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(viewModel.isFaceDetected ? Color(hex: "4CAF50") : CelleuxColors.textPrimary)
+                    .contentTransition(.numericText())
+
+                HStack(spacing: 6) {
+                    Image(systemName: viewModel.lightingQuality.icon)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(viewModel.lightingQuality.color)
+                    Text(viewModel.lightingQuality.rawValue)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(viewModel.lightingQuality.color)
+                }
+            }
+
+            Spacer()
+
+            if viewModel.isFaceDetected {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color(hex: "4CAF50"))
+                    .transition(.scale.combined(with: .opacity))
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.white.opacity(0.95))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(
+                    viewModel.isFaceDetected ? Color(hex: "4CAF50").opacity(0.2) : CelleuxColors.silverLight.opacity(0.4),
+                    lineWidth: 1
+                )
+        )
+        .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 3)
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.isFaceDetected)
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.lightingQuality)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                faceGuidePulse = true
+            }
+        }
+    }
+
+    // MARK: - Scanning
+
+    private var scanningContent: some View {
+        ZStack {
+            Color(hex: "0A0A10").ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                cameraContainer(isScanning: true, showHeatMap: false)
+                Spacer(minLength: 16)
+
+                VStack(spacing: 12) {
+                    Text(viewModel.analysisStatusText)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .contentTransition(.numericText())
+                        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: viewModel.analysisStatusText)
+
+                    Text(viewModel.analysisDetailText)
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundStyle(Color(hex: "E8D6A8").opacity(0.8))
+                        .contentTransition(.numericText())
+                        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: viewModel.analysisDetailText)
+
+                    scanProgressCapsules
+                }
+                .padding(.vertical, 16)
+                .padding(.horizontal, 20)
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(.ultraThinMaterial)
+                        .environment(\.colorScheme, .dark)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(Color(hex: "E8D6A8").opacity(0.15), lineWidth: 0.5)
+                )
+                .padding(.bottom, 90)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 4)
+        }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                progressRingGlow = true
+            }
+        }
+        .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.5), trigger: scanHapticMilestone)
+        .onChange(of: viewModel.scanProgress) { oldValue, newValue in
+            let oldMilestone = Int(oldValue * 4)
+            let newMilestone = Int(newValue * 4)
+            if newMilestone > oldMilestone {
+                scanHapticMilestone = newMilestone
+            }
+        }
+    }
+
+    private var scanProgressCapsules: some View {
+        HStack(spacing: 4) {
+            ForEach(0..<8, id: \.self) { i in
+                let isFilled = viewModel.scanProgress > Double(i) / 8.0
+                Capsule()
+                    .fill(isFilled ? Color(hex: "E8D6A8") : Color.white.opacity(0.08))
+                    .frame(height: 4)
+                    .animation(.spring(response: 0.35, dampingFraction: 0.7), value: viewModel.scanProgress)
+            }
+        }
+        .padding(.top, 4)
+    }
+
+    private var scanningOverlayContent: some View {
+        VStack {
+            HStack {
+                Spacer()
+                ZStack {
+                    Circle().fill(Color.black.opacity(0.4)).frame(width: 56, height: 56)
+                    Circle().stroke(Color.white.opacity(0.1), lineWidth: 2.5).frame(width: 52, height: 52)
+                    Circle()
+                        .trim(from: 0, to: viewModel.scanProgress)
+                        .stroke(
+                            AngularGradient(colors: [Color(hex: "E8D6A8"), Color(hex: "C0C8D4"), Color(hex: "E8D6A8")], center: .center),
+                            style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
+                        )
+                        .frame(width: 52, height: 52)
+                        .rotationEffect(.degrees(-90))
+                    Text("\(Int(viewModel.scanProgress * 100))%")
+                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(Color(hex: "E8D6A8"))
+                        .contentTransition(.numericText(countsDown: false))
+                }
+                .padding(.top, 20)
+                .padding(.trailing, 20)
+            }
+            Spacer()
+        }
+    }
+
+    // MARK: - Analyzing
+
+    private var analyzingContent: some View {
+        ZStack {
+            Color(hex: "0A0A10").ignoresSafeArea()
+
+            VStack(spacing: 32) {
+                AnalyzingBrainView(isActive: true)
+
+                VStack(spacing: 10) {
+                    Text("Computing 10 skin metrics")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.white)
+
+                    Text(analysisMetricNames[analysisMetricIndex])
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Color(hex: "E8D6A8").opacity(0.9))
+                        .contentTransition(.numericText())
+                        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: analysisMetricIndex)
+                        .id(analysisMetricIndex)
+                }
+
+                HStack(spacing: 6) {
+                    ForEach(0..<9, id: \.self) { i in
+                        Circle()
+                            .fill(i <= analysisMetricIndex ? Color(hex: "E8D6A8") : Color.white.opacity(0.12))
+                            .frame(width: 6, height: 6)
+                            .scaleEffect(i == analysisMetricIndex ? 1.4 : 1.0)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: analysisMetricIndex)
+                    }
+                }
+
+                Text("PROCESSING ON-DEVICE")
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.25))
+                    .tracking(2)
+            }
+        }
+        .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.3), trigger: analysisMetricIndex)
+        .onAppear {
+            startAnalysisMetricCycling()
+        }
+    }
+
+    private func startAnalysisMetricCycling() {
+        analysisMetricIndex = 0
+        for i in 1..<analysisMetricNames.count {
+            Task {
+                try? await Task.sleep(for: .milliseconds(280 * i))
+                withAnimation {
+                    analysisMetricIndex = i
+                }
+            }
+        }
+    }
+
+    // MARK: - Camera Container
 
     private func cameraContainer(isScanning: Bool, showHeatMap: Bool) -> some View {
         ZStack {
@@ -426,91 +726,30 @@ struct ScanView: View {
         }
     }
 
-    private var bottomControls: some View {
-        VStack(spacing: 14) {
-            HStack(spacing: 8) {
-                Image(systemName: viewModel.lightingQuality.icon)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(viewModel.lightingQuality.color)
-                Text(viewModel.lightingQuality.rawValue)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(viewModel.lightingQuality.color)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(
-                Capsule()
-                    .fill(Color.white.opacity(0.95))
-            )
-            .overlay(
-                Capsule()
-                    .stroke(Color.white.opacity(0.6), lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(0.06), radius: 6, x: 0, y: 2)
+    // MARK: - Heat Map
 
-            HStack(spacing: 16) {
-                scanInfoItem(icon: "clock", value: "~8s", label: "Duration")
-                Rectangle().fill(LinearGradient(colors: [Color(hex: "D4C4A0").opacity(0.05), Color(hex: "C9A96E").opacity(0.15), Color(hex: "D4C4A0").opacity(0.05)], startPoint: .top, endPoint: .bottom)).frame(width: 1, height: 28)
-                scanInfoItem(icon: "lock.shield", value: "Private", label: "On-Device")
-                Rectangle().fill(LinearGradient(colors: [Color(hex: "D4C4A0").opacity(0.05), Color(hex: "C9A96E").opacity(0.15), Color(hex: "D4C4A0").opacity(0.05)], startPoint: .top, endPoint: .bottom)).frame(width: 1, height: 28)
-                scanInfoItem(icon: "chart.bar", value: "150+", label: "Markers")
-            }
-            .padding(.vertical, 14)
-            .padding(.horizontal, 20)
-            .background(premiumInfoBarBackground)
+    private var heatMapContent: some View {
+        ZStack {
+            Color(hex: "0A0A10").ignoresSafeArea()
 
-            HStack(spacing: 10) {
-                Button {
-                    scanTrigger.toggle()
-                    withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
-                        viewModel.beginScan(modelContext: modelContext)
-                    }
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "faceid")
-                            .font(.system(size: 16, weight: .light))
-                        Text("Scan")
-                            .font(.system(size: 15, weight: .semibold))
-                            .tracking(0.3)
-                    }
-                    .foregroundStyle(CelleuxColors.textPrimary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                }
-                .buttonStyle(Premium3DButtonStyle())
-                .sensoryFeedback(.impact(flexibility: .rigid, intensity: 0.8), trigger: scanTrigger)
-
-                Button {
-                    withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
-                        viewModel.showHeatMapMode()
-                    }
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "waveform.badge.magnifyingglass")
-                            .font(.system(size: 14, weight: .medium))
-                        Text("AR Map")
-                            .font(.system(size: 13, weight: .semibold))
-                    }
-                    .foregroundStyle(Color(hex: "E8D6A8"))
+            VStack(spacing: 0) {
+                cameraContainer(isScanning: false, showHeatMap: true)
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 16)
-                    .background(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(Color(hex: "0A0A10"))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .stroke(Color(hex: "E8D6A8").opacity(0.3), lineWidth: 1)
-                    )
-                }
-                .shadow(color: Color(hex: "E8D6A8").opacity(0.15), radius: 10, x: 0, y: 4)
+                    .padding(.top, 4)
+
+                Spacer()
             }
 
-            Text(viewModel.lastScanText)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(CelleuxColors.textLabel)
+            SkinConcernOverlayView(
+                selectedMode: $viewModel.heatMapMode,
+                showHeatMap: $viewModel.showHeatMap,
+                scanResult: viewModel.currentResult ?? viewModel.scanHistory.first
+            )
+            .padding(.bottom, 90)
         }
     }
+
+    // MARK: - Helpers
 
     private var premiumInfoBarBackground: some View {
         ZStack {
@@ -581,197 +820,5 @@ struct ScanView: View {
                 .tracking(0.8)
         }
         .frame(maxWidth: .infinity)
-    }
-
-    private var scanningContent: some View {
-        ZStack {
-            Color(hex: "0A0A10").ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                cameraContainer(isScanning: true, showHeatMap: false)
-                Spacer(minLength: 16)
-                VStack(spacing: 10) {
-                    Text(viewModel.analysisStatusText)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .contentTransition(.numericText())
-                    Text(viewModel.analysisDetailText)
-                        .font(.system(size: 12, weight: .medium, design: .monospaced))
-                        .foregroundStyle(Color(hex: "E8D6A8").opacity(0.8))
-                        .contentTransition(.numericText())
-                    HStack(spacing: 6) {
-                        ForEach(0..<5) { i in
-                            Capsule()
-                                .fill(viewModel.scanProgress > Double(i) / 5.0 ? Color(hex: "E8D6A8") : Color.white.opacity(0.1))
-                                .frame(width: viewModel.scanProgress > Double(i) / 5.0 ? 18 : 6, height: 6)
-                                .animation(.spring(response: 0.35, dampingFraction: 0.7), value: viewModel.scanProgress)
-                        }
-                    }
-                    .padding(.top, 4)
-                }
-                .padding(.vertical, 14)
-                .padding(.horizontal, 20)
-                .background(
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(.ultraThinMaterial)
-                        .environment(\.colorScheme, .dark)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color(hex: "E8D6A8").opacity(0.15), lineWidth: 0.5)
-                )
-                .padding(.bottom, 90)
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 4)
-        }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                progressRingGlow = true
-            }
-        }
-        .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.5), trigger: scanHapticMilestone)
-        .onChange(of: viewModel.scanProgress) { oldValue, newValue in
-            let oldMilestone = Int(oldValue * 4)
-            let newMilestone = Int(newValue * 4)
-            if newMilestone > oldMilestone {
-                scanHapticMilestone = newMilestone
-            }
-        }
-    }
-
-    private var scanningOverlayContent: some View {
-        VStack {
-            HStack {
-                Spacer()
-                ZStack {
-                    Circle().fill(Color.black.opacity(0.4)).frame(width: 56, height: 56)
-                    Circle().stroke(Color.white.opacity(0.1), lineWidth: 2.5).frame(width: 52, height: 52)
-                    Circle()
-                        .trim(from: 0, to: viewModel.scanProgress)
-                        .stroke(
-                            AngularGradient(colors: [Color(hex: "E8D6A8"), Color(hex: "C0C8D4"), Color(hex: "E8D6A8")], center: .center),
-                            style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
-                        )
-                        .frame(width: 52, height: 52)
-                        .rotationEffect(.degrees(-90))
-                    Text("\(Int(viewModel.scanProgress * 100))%")
-                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(Color(hex: "E8D6A8"))
-                        .contentTransition(.numericText(countsDown: false))
-                }
-                .padding(.top, 20)
-                .padding(.trailing, 20)
-            }
-            Spacer()
-        }
-    }
-
-    private var analyzingContent: some View {
-        ZStack {
-            Color(hex: "0A0A10").ignoresSafeArea()
-
-            VStack(spacing: 28) {
-                ZStack {
-                    Circle()
-                        .stroke(
-                            AngularGradient(
-                                colors: [
-                                    Color(hex: "E8D6A8").opacity(0.3),
-                                    Color(hex: "C0C8D4").opacity(0.2),
-                                    Color(hex: "E8D6A8").opacity(0.1),
-                                ],
-                                center: .center
-                            ),
-                            lineWidth: 2
-                        )
-                        .frame(width: 80, height: 80)
-                        .phaseAnimator([false, true]) { content, phase in
-                            content
-                                .scaleEffect(phase ? 1.06 : 0.96)
-                                .rotationEffect(.degrees(phase ? 8 : -8))
-                        } animation: { _ in
-                            .easeInOut(duration: 1.8)
-                        }
-
-                    Circle()
-                        .fill(
-                            RadialGradient(
-                                colors: [Color(hex: "E8D6A8").opacity(0.08), .clear],
-                                center: .center,
-                                startRadius: 0,
-                                endRadius: 50
-                            )
-                        )
-                        .frame(width: 100, height: 100)
-                        .phaseAnimator([false, true]) { content, phase in
-                            content
-                                .scaleEffect(phase ? 1.2 : 0.9)
-                                .opacity(phase ? 0.8 : 0.3)
-                        } animation: { _ in
-                            .easeInOut(duration: 2.2)
-                        }
-
-                    Image(systemName: "brain.head.profile")
-                        .font(.system(size: 28, weight: .light))
-                        .foregroundStyle(Color(hex: "E8D6A8"))
-                        .symbolEffect(.variableColor.iterative, options: .repeating, isActive: true)
-                }
-
-                VStack(spacing: 8) {
-                    Text("Computing skin metrics...")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .phaseAnimator([false, true]) { content, phase in
-                            content.opacity(phase ? 1.0 : 0.6)
-                        } animation: { _ in
-                            .easeInOut(duration: 1.2)
-                        }
-
-                    Text("Analyzing texture, hydration, brightness & redness")
-                        .font(.system(size: 13, weight: .regular))
-                        .foregroundStyle(.white.opacity(0.5))
-                        .multilineTextAlignment(.center)
-                        .lineSpacing(4)
-                }
-
-                HStack(spacing: 10) {
-                    ForEach(0..<4, id: \.self) { i in
-                        Circle()
-                            .fill(Color(hex: "E8D6A8"))
-                            .frame(width: 6, height: 6)
-                            .phaseAnimator([false, true]) { content, phase in
-                                content
-                                    .scaleEffect(phase ? 1.3 : 0.7)
-                                    .opacity(phase ? 1.0 : 0.3)
-                            } animation: { _ in
-                                .easeInOut(duration: 0.6).delay(Double(i) * 0.15)
-                            }
-                    }
-                }
-            }
-        }
-        .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.3), trigger: true)
-    }
-
-    private var heatMapContent: some View {
-        ZStack {
-            Color(hex: "0A0A10").ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                cameraContainer(isScanning: false, showHeatMap: true)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 4)
-
-                Spacer()
-            }
-
-            SkinConcernOverlayView(
-                selectedMode: $viewModel.heatMapMode,
-                showHeatMap: $viewModel.showHeatMap,
-                scanResult: viewModel.currentResult ?? viewModel.scanHistory.first
-            )
-            .padding(.bottom, 90)
-        }
     }
 }

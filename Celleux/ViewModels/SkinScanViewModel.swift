@@ -35,14 +35,16 @@ final class SkinScanViewModel {
     private let calibrationService = CalibrationService()
 
     private let scanPhases: [(range: ClosedRange<Double>, status: String, detail: String)] = [
-        (0.0...0.12, "Mapping facial geometry...", "DETECTING FACE MESH"),
-        (0.12...0.25, "Analyzing facial structure...", "TRIANGULATING 1,220 VERTICES"),
-        (0.25...0.38, "Scanning skin texture...", "TEXTURE ANALYSIS IN PROGRESS"),
-        (0.38...0.50, "Measuring hydration levels...", "COLORIMETRIC SAMPLING"),
-        (0.50...0.62, "Evaluating radiance...", "L*a*b* COLOR SPACE CONVERSION"),
-        (0.62...0.75, "Checking pore visibility...", "LAPLACIAN VARIANCE COMPUTE"),
-        (0.75...0.88, "Analyzing redness patterns...", "a* CHANNEL EXTRACTION"),
-        (0.88...1.0, "Finalizing analysis...", "COMPILING SKIN REPORT"),
+        (0.0...0.10, "Mapping facial geometry...", "DETECTING 1,220 VERTICES"),
+        (0.10...0.20, "Capturing skin texture...", "LAPLACIAN VARIANCE COMPUTE"),
+        (0.20...0.30, "Measuring hydration...", "SATURATION ANALYSIS"),
+        (0.30...0.40, "Evaluating radiance...", "L*a*b* COLOR SPACE"),
+        (0.40...0.50, "Analyzing redness...", "a* CHANNEL EXTRACTION"),
+        (0.50...0.60, "Scanning pore density...", "HIGH-FREQ ENERGY MAP"),
+        (0.60...0.70, "Checking tone uniformity...", "L* STDDEV ACROSS REGIONS"),
+        (0.70...0.80, "Mapping under-eye area...", "DELTA-L* COMPUTATION"),
+        (0.80...0.90, "Detecting wrinkle depth...", "GABOR FILTER BANK"),
+        (0.90...1.0, "Measuring elasticity...", "BLEND SHAPE ANALYSIS"),
     ]
 
     var lastScanText: String {
