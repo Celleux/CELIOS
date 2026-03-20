@@ -17,6 +17,10 @@ struct ScanResultsView: View {
     @State private var heroLabelVisible: Bool = false
     @State private var expandedRegion: String? = nil
     @State private var showComparison: Bool = false
+    @State private var shareImage: UIImage? = nil
+    @State private var isGeneratingShare: Bool = false
+    @State private var showShareSheet: Bool = false
+    @State private var isNewHighScore: Bool = false
 
     private var calibration: CalibrationResult? { result.calibration }
 
@@ -34,6 +38,7 @@ struct ScanResultsView: View {
                 regionBreakdown
                 metricDetailCarousel
                 comparisonButton
+                shareButton
                 actionButtons
                 disclaimerText
             }
@@ -51,36 +56,14 @@ struct ScanResultsView: View {
                     .presentationDragIndicator(.visible)
             }
         }
+        .sheet(isPresented: $showShareSheet) {
+            if let image = shareImage {
+                ShareSheetView(image: image)
+            }
+        }
         .onAppear {
-            withAnimation(.spring(response: 0.8, dampingFraction: 0.75)) {
-                appeared = true
-            }
-            withAnimation(.easeOut(duration: 1.4).delay(0.3)) {
-                scoreAnimated = true
-            }
-            withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true).delay(1.0)) {
-                ringGlow = true
-            }
-            animateScoreCount()
-
-            Task {
-                try? await Task.sleep(for: .milliseconds(400))
-                withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                    regionAppeared = true
-                }
-            }
-            Task {
-                try? await Task.sleep(for: .milliseconds(700))
-                withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                    metricsAppeared = true
-                }
-            }
-            Task {
-                try? await Task.sleep(for: .milliseconds(1600))
-                withAnimation(CelleuxSpring.luxury) {
-                    heroLabelVisible = true
-                }
-            }
+            runSequentialAppearAnimation()
+            checkNewHighScore()
         }
     }
 
@@ -566,6 +549,33 @@ struct ScanResultsView: View {
         }
     }
 
+    // MARK: - Share Button
+
+    private var shareButton: some View {
+        Button {
+            generateShareImage()
+        } label: {
+            HStack(spacing: 10) {
+                if isGeneratingShare {
+                    ProgressView()
+                        .tint(CelleuxColors.warmGold)
+                        .scaleEffect(0.8)
+                } else {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 14, weight: .medium))
+                }
+                Text("Share Your Progress")
+                    .font(.system(size: 14, weight: .semibold))
+            }
+            .foregroundStyle(CelleuxColors.warmGold)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+        }
+        .buttonStyle(GlassButtonStyle(style: .primary))
+        .disabled(isGeneratingShare)
+        .staggeredAppear(appeared: appeared, delay: 0.48)
+    }
+
     // MARK: - Action Buttons
 
     private var actionButtons: some View {
@@ -721,6 +731,143 @@ struct ScanResultsView: View {
         case .medium: "3-10 scans"
         case .high: "10+ consistent"
         }
+    }
+
+    // MARK: - Sequential Animation
+
+    private func runSequentialAppearAnimation() {
+        withAnimation(.spring(response: 0.8, dampingFraction: 0.75)) {
+            appeared = true
+        }
+        withAnimation(.easeOut(duration: 1.4).delay(0.3)) {
+            scoreAnimated = true
+        }
+        withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true).delay(1.0)) {
+            ringGlow = true
+        }
+        animateScoreCount()
+
+        Task {
+            try? await Task.sleep(for: .milliseconds(400))
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                regionAppeared = true
+            }
+        }
+        Task {
+            try? await Task.sleep(for: .milliseconds(700))
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                metricsAppeared = true
+            }
+        }
+        Task {
+            try? await Task.sleep(for: .milliseconds(1600))
+            withAnimation(CelleuxSpring.luxury) {
+                heroLabelVisible = true
+            }
+        }
+    }
+
+    private func checkNewHighScore() {
+        let previousBest = history.filter { $0.id != result.id }.map { $0.overallScore }.max() ?? 0
+        if result.overallScore > previousBest && !history.isEmpty {
+            isNewHighScore = true
+        }
+    }
+
+    // MARK: - Share Image Generation
+
+    private func generateShareImage() {
+        isGeneratingShare = true
+        let renderer = ImageRenderer(content: shareCardContent)
+        renderer.scale = 3.0
+        if let uiImage = renderer.uiImage {
+            shareImage = uiImage
+            showShareSheet = true
+        }
+        isGeneratingShare = false
+    }
+
+    private var shareCardContent: some View {
+        VStack(spacing: 24) {
+            HStack {
+                Text("CELLEUX")
+                    .font(.system(size: 14, weight: .bold))
+                    .tracking(3)
+                    .foregroundStyle(Color(hex: "C9A96E"))
+                Spacer()
+                Text(result.dateString)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Color(hex: "999999"))
+            }
+
+            VStack(spacing: 8) {
+                ZStack {
+                    Circle()
+                        .stroke(
+                            LinearGradient(
+                                colors: [Color(hex: "D4B078"), Color(hex: "C9A96E")],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            style: StrokeStyle(lineWidth: 6, lineCap: .round)
+                        )
+                        .frame(width: 100, height: 100)
+
+                    Circle()
+                        .trim(from: 0, to: Double(result.overallScore) / 100.0)
+                        .stroke(
+                            LinearGradient(
+                                colors: [Color(hex: "E8D6A8"), Color(hex: "C9A96E")],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            style: StrokeStyle(lineWidth: 6, lineCap: .round)
+                        )
+                        .frame(width: 100, height: 100)
+                        .rotationEffect(.degrees(-90))
+
+                    Text("\(result.overallScore)")
+                        .font(.system(size: 40, weight: .thin))
+                        .foregroundStyle(Color(hex: "1A1A26"))
+                }
+
+                Text("Overall Skin Health")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color(hex: "888888"))
+                    .textCase(.uppercase)
+                    .tracking(1)
+            }
+
+            HStack {
+                Text("Tracked with Celleux")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Color(hex: "AAAAAA"))
+                Spacer()
+                Image(systemName: "lock.shield.fill")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Color(hex: "C9A96E").opacity(0.6))
+                Text("On-Device")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Color(hex: "AAAAAA"))
+            }
+        }
+        .padding(28)
+        .frame(width: 320)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(Color.white)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(
+                    LinearGradient(
+                        colors: [Color(hex: "E8DCC8").opacity(0.6), Color(hex: "C9A96E").opacity(0.3)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
     }
 
     // MARK: - Helpers

@@ -659,10 +659,10 @@ struct ARFaceTrackingView: UIViewRepresentable {
                 return Float(max(0, min(1, scores.rednessScore / 100.0)))
             case .texture:
                 return Float(max(0, min(1, scores.textureScore / 100.0)))
-            case .darkSpots:
-                return Float(max(0, min(1, scores.brightnessScore / 100.0)))
-            case .dehydration:
+            case .hydration:
                 return Float(max(0, min(1, scores.hydrationScore / 100.0)))
+            case .tone:
+                return Float(max(0, min(1, scores.toneUniformityScore / 100.0)))
             }
         }
 

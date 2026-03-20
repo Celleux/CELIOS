@@ -112,12 +112,42 @@ nonisolated enum SkinConcernType: String, CaseIterable, Sendable {
     }
 }
 
-nonisolated enum HeatMapMode: String, Sendable {
-    case all = "All Concerns"
-    case redness = "Redness"
+nonisolated enum HeatMapMode: String, CaseIterable, Sendable {
+    case all = "All"
     case texture = "Texture"
-    case darkSpots = "Dark Spots"
-    case dehydration = "Dehydration"
+    case hydration = "Hydration"
+    case redness = "Redness"
+    case tone = "Tone"
+
+    var icon: String {
+        switch self {
+        case .all: "square.grid.3x3.fill"
+        case .texture: "square.grid.3x3"
+        case .hydration: "drop.fill"
+        case .redness: "flame"
+        case .tone: "paintpalette"
+        }
+    }
+
+    var metricType: SkinMetricType? {
+        switch self {
+        case .all: nil
+        case .texture: .textureEvenness
+        case .hydration: .apparentHydration
+        case .redness: .rednessInflammation
+        case .tone: .toneUniformity
+        }
+    }
+
+    var accentColor: Color {
+        switch self {
+        case .all: Color(hex: "E8D6A8")
+        case .texture: Color(hex: "C9A96E")
+        case .hydration: Color(hex: "C0C8D4")
+        case .redness: Color(hex: "D4A574")
+        case .tone: Color(hex: "B0B8C4")
+        }
+    }
 }
 
 nonisolated enum ProgressTimeframe: String, CaseIterable, Sendable {
