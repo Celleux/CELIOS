@@ -80,7 +80,16 @@ final class SkinScanViewModel {
                     wrinkleDepthScore: record.wrinkleDepthScore,
                     elasticityProxyScore: record.elasticityProxyScore,
                     overallScore: Double(record.overallScore),
+                    itaAngle: record.itaAngle,
+                    aStarMean: record.aStarMean,
                     bStarMean: record.bStarMean,
+                    laplacianVariance: record.laplacianVariance,
+                    saturationVariance: record.saturationVariance,
+                    poreHFEnergy: record.poreHFEnergy,
+                    gaborEnergy: record.gaborEnergy,
+                    toneStdDev: record.toneStdDev,
+                    underEyeDeltaL: record.underEyeDeltaL,
+                    elasticityRecoverySpeed: record.elasticityRecoverySpeed,
                     regionData: extractRegionDataFromRecord(record)
                 )
             )
@@ -261,9 +270,9 @@ final class SkinScanViewModel {
             }
 
             latestRegionScores = analysis.regionData
-            saveToSwiftData(analysis: analysis, modelContext: modelContext)
 
             let calResult = calibrationService.processCalibration(analysis: analysis, modelContext: modelContext)
+            saveToSwiftData(analysis: analysis, calibration: calResult, modelContext: modelContext)
             calibrationResult = calResult
             isCalibrating = calResult.isCalibrating
             calibrationScansRemaining = calResult.calibrationScansRemaining
@@ -277,11 +286,7 @@ final class SkinScanViewModel {
         }
     }
 
-    private func saveToSwiftData(analysis: SkinAnalysisData, modelContext: ModelContext) {
-        let scanDescriptor = FetchDescriptor<SkinScanRecord>()
-        let existingScanCount = (try? modelContext.fetchCount(scanDescriptor)) ?? 0
-        let isCal = existingScanCount < 3
-
+    private func saveToSwiftData(analysis: SkinAnalysisData, calibration calResult: CalibrationResult, modelContext: ModelContext) {
         let record = SkinScanRecord(
             date: Date(),
             overallScore: Int(analysis.overallScore.rounded()),
@@ -299,13 +304,23 @@ final class SkinScanViewModel {
             bStarMean: analysis.bStarMean,
             laplacianVariance: analysis.laplacianVariance,
             saturationVariance: analysis.saturationVariance,
+            poreHFEnergy: analysis.poreHFEnergy,
+            gaborEnergy: analysis.gaborEnergy,
+            toneStdDev: analysis.toneStdDev,
+            underEyeDeltaL: analysis.underEyeDeltaL,
+            elasticityRecoverySpeed: analysis.elasticityRecoverySpeed,
             lightingAmbientIntensity: analysis.lightingConditions?.ambientIntensity ?? 0,
             lightingColorTemperature: analysis.lightingConditions?.colorTemperature ?? 0,
             lightingCorrectionApplied: analysis.lightingConditions?.correctionApplied ?? false,
-            isCalibrationPhase: isCal,
-            confidenceLevel: isCal ? ConfidenceLevel.low.rawValue : ConfidenceLevel.medium.rawValue,
-            deltaFromBaseline: 0
+            isCalibrationPhase: calResult.isCalibrating,
+            confidenceLevel: calResult.overallConfidence.rawValue,
+            deltaFromBaseline: calResult.deltaFromBaseline ?? 0
         )
+
+        for metric in SkinMetricType.allCases where metric != .overallSkinHealth && metric.isImplemented {
+            let confidence = calResult.perMetricConfidence[metric] ?? .low
+            record.setConfidenceForMetric(metric, level: confidence.rawValue)
+        }
 
         let regionNames = ["Forehead", "Left Cheek", "Right Cheek", "Chin", "Under-Eyes", "Nose"]
         for name in regionNames {

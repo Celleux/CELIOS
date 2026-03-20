@@ -173,6 +173,9 @@ nonisolated struct RegionScores: Sendable {
     var bStarMean: Double = 0
     var laplacianVariance: Double = 0
     var saturationVariance: Double = 0
+    var hfEnergy: Double = 0
+    var gaborFilterEnergy: Double = 0
+    var meanL: Double = 0
 
     var brightnessScore: Double { brightnessRadianceScore }
     var textureScore: Double { textureEvennessScore }
@@ -211,6 +214,11 @@ nonisolated struct SkinAnalysisData: Sendable {
     var bStarMean: Double = 0
     var laplacianVariance: Double = 0
     var saturationVariance: Double = 0
+    var poreHFEnergy: Double = 0
+    var gaborEnergy: Double = 0
+    var toneStdDev: Double = 0
+    var underEyeDeltaL: Double = 0
+    var elasticityRecoverySpeed: Double = 0
     var regionData: [String: RegionScores] = [:]
     var lightingConditions: LightingConditions?
 

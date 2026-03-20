@@ -138,7 +138,7 @@ final class CalibrationService {
             let existing = baseline.regionMeans(for: regionName)
             baseline.setRegionMeans(
                 for: regionName,
-                meanL: runningAverage(old: existing.meanL, newVal: regionScores.itaAngle != 0 ? regionScores.itaAngle : existing.meanL, n: n, newN: newN),
+                meanL: runningAverage(old: existing.meanL, newVal: regionScores.meanL != 0 ? regionScores.meanL : existing.meanL, n: n, newN: newN),
                 meanA: runningAverage(old: existing.meanA, newVal: regionScores.aStarMean, n: n, newN: newN),
                 meanB: runningAverage(old: existing.meanB, newVal: regionScores.bStarMean, n: n, newN: newN),
                 textureVar: runningAverage(old: existing.textureVar, newVal: regionScores.laplacianVariance, n: n, newN: newN),

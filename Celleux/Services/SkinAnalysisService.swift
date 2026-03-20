@@ -55,7 +55,10 @@ nonisolated class SkinAnalysisService: Sendable {
                 aStarMean: metrics.redness,
                 bStarMean: metrics.bStar,
                 laplacianVariance: metrics.texture,
-                saturationVariance: metrics.saturationVariance
+                saturationVariance: metrics.saturationVariance,
+                hfEnergy: metrics.highFreqLaplacianEnergy,
+                gaborFilterEnergy: metrics.gaborEnergy,
+                meanL: metrics.meanL
             )
 
             allITA.append(metrics.ita)
@@ -90,6 +93,7 @@ nonisolated class SkinAnalysisService: Sendable {
         let leftCheekL = regionMeanLMap["Left Cheek"]
         let rightCheekL = regionMeanLMap["Right Cheek"]
         var underEyeQualityScore: Double = 0
+        var computedUnderEyeDeltaL: Double = 0
         if let eyeL = underEyeLStar {
             let cheekL: Double
             if let lL = leftCheekL, let rL = rightCheekL {
@@ -101,8 +105,8 @@ nonisolated class SkinAnalysisService: Sendable {
             } else {
                 cheekL = eyeL
             }
-            let deltaL = abs(eyeL - cheekL)
-            underEyeQualityScore = mapUnderEyeQualityToScore(deltaL)
+            computedUnderEyeDeltaL = abs(eyeL - cheekL)
+            underEyeQualityScore = mapUnderEyeQualityToScore(computedUnderEyeDeltaL)
         }
 
         for (name, var scores) in regionData {
@@ -136,6 +140,11 @@ nonisolated class SkinAnalysisService: Sendable {
             bStarMean: avgBStar,
             laplacianVariance: avgTexture,
             saturationVariance: avgSatVar,
+            poreHFEnergy: avgHFEnergy,
+            gaborEnergy: avgGaborEnergy,
+            toneStdDev: lStarStdDev,
+            underEyeDeltaL: computedUnderEyeDeltaL,
+            elasticityRecoverySpeed: blendShapeElasticity ?? 0,
             regionData: regionData
         )
 
@@ -186,7 +195,10 @@ nonisolated class SkinAnalysisService: Sendable {
             aStarMean: metrics.redness,
             bStarMean: metrics.bStar,
             laplacianVariance: metrics.texture,
-            saturationVariance: metrics.saturationVariance
+            saturationVariance: metrics.saturationVariance,
+            hfEnergy: metrics.highFreqLaplacianEnergy,
+            gaborFilterEnergy: metrics.gaborEnergy,
+            meanL: metrics.meanL
         )
 
         let regionData: [String: RegionScores] = [
@@ -212,6 +224,11 @@ nonisolated class SkinAnalysisService: Sendable {
             bStarMean: metrics.bStar,
             laplacianVariance: metrics.texture,
             saturationVariance: metrics.saturationVariance,
+            poreHFEnergy: metrics.highFreqLaplacianEnergy,
+            gaborEnergy: metrics.gaborEnergy,
+            toneStdDev: 0,
+            underEyeDeltaL: 0,
+            elasticityRecoverySpeed: blendShapeElasticity ?? 0,
             regionData: regionData
         )
 
