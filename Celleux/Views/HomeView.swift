@@ -496,7 +496,7 @@ struct HomeView: View {
                         HStack(spacing: 6) {
                             Image(systemName: "chart.xyaxis.line")
                                 .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(CelleuxColors.dataViolet)
+                                .foregroundStyle(CelleuxColors.dataGold)
                             Text("YOUR SKIN THIS WEEK")
                                 .font(.system(size: 12, weight: .semibold, design: .rounded))
                                 .foregroundStyle(Color(red: 0.15, green: 0.15, blue: 0.20).opacity(0.55))

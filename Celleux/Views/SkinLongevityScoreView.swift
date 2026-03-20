@@ -317,7 +317,7 @@ struct SkinLongevityScoreView: View {
                             x: .value("Date", score.date),
                             y: .value("Score", score.compositeScore)
                         )
-                        .foregroundStyle(CelleuxColors.dataViolet)
+                        .foregroundStyle(CelleuxColors.dataGold)
                         .interpolationMethod(.catmullRom)
                         .lineStyle(StrokeStyle(lineWidth: 2.5))
 

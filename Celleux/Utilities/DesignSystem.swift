@@ -1,5 +1,113 @@
 import SwiftUI
 
+// MARK: - Typography System
+
+enum CelleuxType {
+    static var display: Font { .system(size: 48, weight: .ultraLight) }
+    static var title1: Font { .system(size: 32, weight: .light) }
+    static var headline: Font { .system(size: 18, weight: .regular) }
+    static var body: Font { .system(size: 16, weight: .regular) }
+    static var caption: Font { .system(size: 12, weight: .light) }
+    static var label: Font { .system(size: 8, weight: .bold) }
+    static var metric: Font { .system(size: 56, weight: .thin) }
+
+    static let displayTracking: CGFloat = 2
+    static let title1Tracking: CGFloat = 1
+    static let captionTracking: CGFloat = 0.8
+    static let labelTracking: CGFloat = 1.5
+    static let metricTracking: CGFloat = 0.5
+    static let bodyLineSpacing: CGFloat = 8
+}
+
+// MARK: - Shadow System
+
+enum CelleuxShadow {
+    case tight
+    case medium
+    case ambient
+
+    var color: Color {
+        switch self {
+        case .tight: .black.opacity(0.04)
+        case .medium: .black.opacity(0.06)
+        case .ambient: .black.opacity(0.03)
+        }
+    }
+
+    var radius: CGFloat {
+        switch self {
+        case .tight: 2
+        case .medium: 10
+        case .ambient: 24
+        }
+    }
+
+    var y: CGFloat {
+        switch self {
+        case .tight: 1
+        case .medium: 5
+        case .ambient: 12
+        }
+    }
+}
+
+extension View {
+    func celleuxDepthShadow() -> some View {
+        self
+            .shadow(color: CelleuxShadow.tight.color, radius: CelleuxShadow.tight.radius, x: 0, y: CelleuxShadow.tight.y)
+            .shadow(color: CelleuxShadow.medium.color, radius: CelleuxShadow.medium.radius, x: 0, y: CelleuxShadow.medium.y)
+            .shadow(color: CelleuxShadow.ambient.color, radius: CelleuxShadow.ambient.radius, x: 0, y: CelleuxShadow.ambient.y)
+    }
+}
+
+// MARK: - Spring Animation Tokens
+
+enum CelleuxSpring {
+    static let luxury: Animation = .spring(response: 0.7, dampingFraction: 0.85)
+    static let snappy: Animation = .spring(response: 0.4, dampingFraction: 0.75)
+    static let bouncy: Animation = .spring(response: 0.5, dampingFraction: 0.6)
+}
+
+// MARK: - Spacing Tokens
+
+enum CelleuxSpacing {
+    static let xs: CGFloat = 4
+    static let sm: CGFloat = 8
+    static let md: CGFloat = 16
+    static let lg: CGFloat = 24
+    static let xl: CGFloat = 32
+    static let xxl: CGFloat = 48
+}
+
+// MARK: - Haptic Tokens
+
+enum CelleuxHaptic {
+    static let selection: SensoryFeedback = .selection
+    static let impact: SensoryFeedback = .impact(flexibility: .rigid, intensity: 0.8)
+    static let success: SensoryFeedback = .success
+    static let softTap: SensoryFeedback = .impact(flexibility: .soft, intensity: 0.3)
+}
+
+// MARK: - Animated Number Modifier
+
+struct AnimatedNumberModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .contentTransition(.numericText(countsDown: false))
+            .transaction { t in
+                t.animation = CelleuxSpring.luxury
+            }
+    }
+}
+
+extension View {
+    func animatedNumber() -> some View {
+        modifier(AnimatedNumberModifier())
+    }
+}
+
+// MARK: - Display P3 Colors
+
 enum CelleuxP3 {
     static let pureWhite = Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0)
     static let warmCream = Color(.displayP3, red: 0.96, green: 0.95, blue: 0.93)
@@ -15,12 +123,9 @@ enum CelleuxP3 {
 }
 
 enum CelleuxColors {
-    static let background = Color(red: 0.97, green: 0.96, blue: 0.94)
-    static let cardSurface = Color.white.opacity(0.92)
-    static let depthLayer = Color(red: 0.98, green: 0.98, blue: 0.98)
-
-    static let accent = Color(.displayP3, red: 0.42, green: 0.247, blue: 0.627)
-    static let accentLight = Color(.displayP3, red: 0.608, green: 0.435, blue: 0.816)
+    static let background = Color(.displayP3, red: 0.97, green: 0.96, blue: 0.94)
+    static let cardSurface = Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.92)
+    static let depthLayer = Color(.displayP3, red: 0.98, green: 0.98, blue: 0.98)
 
     static let silverLight = Color(.displayP3, red: 0.816, green: 0.847, blue: 0.878)
     static let silver = Color(.displayP3, red: 0.69, green: 0.722, blue: 0.757)
@@ -31,11 +136,11 @@ enum CelleuxColors {
     static let champagneGold = Color(.displayP3, red: 0.788, green: 0.663, blue: 0.431)
     static let roseGold = Color(.displayP3, red: 0.831, green: 0.647, blue: 0.455)
 
-    static let textPrimary = Color(red: 0.10, green: 0.10, blue: 0.15)
-    static let textSecondary = Color(red: 0.10, green: 0.10, blue: 0.15).opacity(0.65)
-    static let textTertiary = Color(red: 0.10, green: 0.10, blue: 0.15).opacity(0.45)
-    static let textLabel = Color(red: 0.10, green: 0.10, blue: 0.15).opacity(0.45)
-    static let sectionLabel = Color(red: 0.10, green: 0.10, blue: 0.15).opacity(0.40)
+    static let textPrimary = Color(.displayP3, red: 0.10, green: 0.10, blue: 0.15)
+    static let textSecondary = Color(.displayP3, red: 0.10, green: 0.10, blue: 0.15, opacity: 0.65)
+    static let textTertiary = Color(.displayP3, red: 0.10, green: 0.10, blue: 0.15, opacity: 0.45)
+    static let textLabel = Color(.displayP3, red: 0.10, green: 0.10, blue: 0.15, opacity: 0.45)
+    static let sectionLabel = Color(.displayP3, red: 0.10, green: 0.10, blue: 0.15, opacity: 0.40)
 
     static let glassBackground = Color.white.opacity(0.92)
     static let glassBorder = Color.white.opacity(0.8)
@@ -120,23 +225,28 @@ enum CelleuxColors {
         colors: [
             Color.white.opacity(0.9),
             Color.white.opacity(0.3),
-            Color(red: 0.78, green: 0.78, blue: 0.80).opacity(0.2)
+            Color(.displayP3, red: 0.78, green: 0.78, blue: 0.80).opacity(0.2)
         ],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
 
-    static let dataViolet = Color(.displayP3, red: 0.42, green: 0.247, blue: 0.627).opacity(0.5)
-    static let dataVioletGradient = LinearGradient(
-        colors: [Color(.displayP3, red: 0.608, green: 0.435, blue: 0.816).opacity(0.5), Color(.displayP3, red: 0.42, green: 0.247, blue: 0.627).opacity(0.5)],
+    static let dataGold = Color(.displayP3, red: 0.788, green: 0.663, blue: 0.431, opacity: 0.7)
+    static let dataGoldGradient = LinearGradient(
+        colors: [Color(.displayP3, red: 0.831, green: 0.769, blue: 0.627, opacity: 0.6), Color(.displayP3, red: 0.788, green: 0.663, blue: 0.431, opacity: 0.6)],
         startPoint: .leading,
         endPoint: .trailing
     )
 
+    @available(*, deprecated, renamed: "dataGold")
+    static var dataViolet: Color { dataGold }
+    @available(*, deprecated, renamed: "dataGoldGradient")
+    static var dataVioletGradient: LinearGradient { dataGoldGradient }
+
     static let iconGoldGradient = LinearGradient(
         colors: [
-            Color(red: 0.79, green: 0.66, blue: 0.43),
-            Color(red: 0.65, green: 0.55, blue: 0.38)
+            Color(.displayP3, red: 0.79, green: 0.66, blue: 0.43),
+            Color(.displayP3, red: 0.65, green: 0.55, blue: 0.38)
         ],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
@@ -144,8 +254,8 @@ enum CelleuxColors {
 
     static let iconBlueGradient = LinearGradient(
         colors: [
-            Color(red: 0.42, green: 0.72, blue: 0.88),
-            Color(red: 0.29, green: 0.61, blue: 0.78)
+            Color(.displayP3, red: 0.69, green: 0.722, blue: 0.757),
+            Color(.displayP3, red: 0.816, green: 0.847, blue: 0.878)
         ],
         startPoint: .top,
         endPoint: .bottom
@@ -153,8 +263,8 @@ enum CelleuxColors {
 
     static let iconLavenderGradient = LinearGradient(
         colors: [
-            Color(red: 0.61, green: 0.56, blue: 0.77),
-            Color(red: 0.48, green: 0.44, blue: 0.66)
+            Color(.displayP3, red: 0.69, green: 0.722, blue: 0.757),
+            Color(.displayP3, red: 0.627, green: 0.659, blue: 0.69)
         ],
         startPoint: .top,
         endPoint: .bottom
@@ -162,8 +272,8 @@ enum CelleuxColors {
 
     static let iconAmberGradient = LinearGradient(
         colors: [
-            Color(red: 0.92, green: 0.75, blue: 0.35),
-            Color(red: 0.79, green: 0.60, blue: 0.30)
+            Color(.displayP3, red: 0.92, green: 0.75, blue: 0.35),
+            Color(.displayP3, red: 0.79, green: 0.60, blue: 0.30)
         ],
         startPoint: .top,
         endPoint: .bottom
@@ -197,14 +307,14 @@ extension Color {
 struct CelleuxMeshBackground: View {
     var body: some View {
         ZStack {
-            Color(red: 0.97, green: 0.96, blue: 0.94)
+            Color(.displayP3, red: 0.97, green: 0.96, blue: 0.94)
                 .ignoresSafeArea()
 
             Circle()
                 .fill(
                     RadialGradient(
                         colors: [
-                            Color(red: 0.92, green: 0.88, blue: 0.80).opacity(0.3),
+                            Color(.displayP3, red: 0.92, green: 0.88, blue: 0.80).opacity(0.3),
                             Color.clear
                         ],
                         center: .topLeading,
@@ -220,7 +330,7 @@ struct CelleuxMeshBackground: View {
                 .fill(
                     RadialGradient(
                         colors: [
-                            Color(red: 0.85, green: 0.86, blue: 0.90).opacity(0.2),
+                            Color(.displayP3, red: 0.85, green: 0.86, blue: 0.90).opacity(0.2),
                             Color.clear
                         ],
                         center: .bottomTrailing,
@@ -292,27 +402,67 @@ struct AmbientParticle {
 struct GlassCard<Content: View>: View {
     let cornerRadius: CGFloat
     let depth: GlassDepth
+    let showShimmer: Bool
     let content: Content
 
-    init(cornerRadius: CGFloat = 24, depth: GlassDepth = .standard, @ViewBuilder content: () -> Content) {
+    init(cornerRadius: CGFloat = 24, depth: GlassDepth = .standard, showShimmer: Bool = false, @ViewBuilder content: () -> Content) {
         self.cornerRadius = cornerRadius
         self.depth = depth
+        self.showShimmer = showShimmer
         self.content = content()
+    }
+
+    private var chromeBorder: AngularGradient {
+        AngularGradient(
+            colors: [
+                CelleuxColors.silverLight.opacity(0.6),
+                CelleuxColors.warmGold.opacity(0.4),
+                Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.8),
+                CelleuxColors.silverBorder.opacity(0.5),
+                CelleuxColors.champagneGold.opacity(0.35),
+                Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.7),
+                CelleuxColors.silverLight.opacity(0.6)
+            ],
+            center: .center
+        )
+    }
+
+    private var innerHighlight: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.15),
+                Color.clear
+            ],
+            startPoint: .top,
+            endPoint: .center
+        )
     }
 
     var body: some View {
         content
             .padding(20)
             .background(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(Color.white.opacity(0.92))
+                ZStack {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.92))
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(innerHighlight)
+                }
             )
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(CelleuxColors.glassEdgeHighlight, lineWidth: 1)
+                    .stroke(chromeBorder, lineWidth: 1)
             )
-            .shadow(color: .black.opacity(0.06), radius: 12, x: 0, y: 6)
-            .shadow(color: .black.opacity(0.03), radius: 30, x: 0, y: 15)
+            .overlay {
+                if showShimmer {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(Color.clear)
+                        .modifier(ShimmerEffect())
+                        .opacity(0.06)
+                        .allowsHitTesting(false)
+                }
+            }
+            .celleuxDepthShadow()
     }
 }
 
@@ -359,19 +509,44 @@ struct CompactGlassCard<Content: View>: View {
         self.content = content()
     }
 
+    private var chromeBorder: AngularGradient {
+        AngularGradient(
+            colors: [
+                CelleuxColors.silverLight.opacity(0.5),
+                CelleuxColors.warmGold.opacity(0.3),
+                Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.7),
+                CelleuxColors.silverBorder.opacity(0.4),
+                CelleuxColors.silverLight.opacity(0.5)
+            ],
+            center: .center
+        )
+    }
+
     var body: some View {
         content
             .padding(16)
             .background(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(Color.white.opacity(0.92))
+                ZStack {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.92))
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.12),
+                                    Color.clear
+                                ],
+                                startPoint: .top,
+                                endPoint: .center
+                            )
+                        )
+                }
             )
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(CelleuxColors.glassEdgeHighlight, lineWidth: 1)
+                    .stroke(chromeBorder, lineWidth: 1)
             )
-            .shadow(color: .black.opacity(0.06), radius: 10, x: 0, y: 5)
-            .shadow(color: .black.opacity(0.03), radius: 24, x: 0, y: 12)
+            .celleuxDepthShadow()
     }
 }
 
@@ -552,7 +727,7 @@ struct LuxuryBezelRing: View {
                     LinearGradient(
                         colors: [
                             Color.white.opacity(0.95),
-                            Color(red: 0.78, green: 0.78, blue: 0.82).opacity(0.5),
+                            Color(.displayP3, red: 0.78, green: 0.78, blue: 0.82).opacity(0.5),
                             Color.white.opacity(0.95)
                         ],
                         startPoint: .topLeading,
@@ -563,7 +738,7 @@ struct LuxuryBezelRing: View {
                 .frame(width: size + lineWidth + 8, height: size + lineWidth + 8)
 
             Circle()
-                .stroke(Color(red: 0.93, green: 0.91, blue: 0.89), lineWidth: lineWidth)
+                .stroke(Color(.displayP3, red: 0.93, green: 0.91, blue: 0.89), lineWidth: lineWidth)
                 .frame(width: size, height: size)
 
             Circle()
@@ -571,8 +746,8 @@ struct LuxuryBezelRing: View {
                 .stroke(
                     LinearGradient(
                         colors: [
-                            Color(red: 0.85, green: 0.72, blue: 0.45),
-                            Color(red: 0.78, green: 0.66, blue: 0.43)
+                            Color(.displayP3, red: 0.85, green: 0.72, blue: 0.45),
+                            Color(.displayP3, red: 0.78, green: 0.66, blue: 0.43)
                         ],
                         startPoint: .topLeading,
                         endPoint: .trailing
@@ -644,7 +819,7 @@ struct SectionHeader: View {
         HStack {
             Text(title)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Color(red: 0.15, green: 0.15, blue: 0.20).opacity(0.55))
+                .foregroundStyle(Color(.displayP3, red: 0.15, green: 0.15, blue: 0.20).opacity(0.55))
                 .textCase(.uppercase)
                 .tracking(1.5)
 
@@ -804,11 +979,11 @@ struct PremiumDivider: View {
             .fill(
                 LinearGradient(
                     colors: [
-                        Color(red: 0.78, green: 0.78, blue: 0.80).opacity(0.02),
-                        Color(red: 0.78, green: 0.78, blue: 0.80).opacity(0.25),
+                        Color(.displayP3, red: 0.78, green: 0.78, blue: 0.80).opacity(0.02),
+                        Color(.displayP3, red: 0.78, green: 0.78, blue: 0.80).opacity(0.25),
                         Color.white.opacity(0.3),
-                        Color(red: 0.78, green: 0.78, blue: 0.80).opacity(0.25),
-                        Color(red: 0.78, green: 0.78, blue: 0.80).opacity(0.02)
+                        Color(.displayP3, red: 0.78, green: 0.78, blue: 0.80).opacity(0.25),
+                        Color(.displayP3, red: 0.78, green: 0.78, blue: 0.80).opacity(0.02)
                     ],
                     startPoint: .leading,
                     endPoint: .trailing
