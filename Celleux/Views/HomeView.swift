@@ -92,7 +92,7 @@ struct HomeView: View {
                     .presentationContentInteraction(.scrolls)
             }
             .sheet(item: $selectedFactor) { factor in
-                FactorDetailSheet(
+                LongevityFactorDetailSheet(
                     factor: factor,
                     score: viewModel.scoreForFactor(factor),
                     detail: viewModel.detailForFactor(factor),
@@ -1295,7 +1295,7 @@ struct MiniFactorRing: View {
 
 // MARK: - Factor Detail Sheet
 
-struct FactorDetailSheet: View {
+struct LongevityFactorDetailSheet: View {
     let factor: LongevityFactor
     let score: Double
     let detail: String
