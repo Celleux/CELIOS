@@ -10,13 +10,18 @@ struct CircadianTimingView: View {
     @State private var completionCelebration: Int = 0
     @State private var clockAnimated: Bool = false
     @State private var swipeOffsets: [String: CGFloat] = [:]
+    @State private var milestoneCelebration: Bool = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 28) {
+                    watchPromptBanner
                     clockHeroSection
+                    streakSection
+                    breathingTimerSection
                     countdownBanner
+                    emptyRitualPrompt
                     doseCardsSection
                     scienceSection
                 }
@@ -47,6 +52,57 @@ struct CircadianTimingView: View {
                     clockAnimated = true
                 }
             }
+            .onChange(of: viewModel.isMilestoneStreak) { _, newValue in
+                if newValue {
+                    withAnimation(CelleuxSpring.bouncy) {
+                        milestoneCelebration = true
+                    }
+                    viewModel.isMilestoneStreak = false
+                }
+            }
+        }
+    }
+
+    // MARK: - Watch Prompt Banner
+
+    @ViewBuilder
+    private var watchPromptBanner: some View {
+        if !viewModel.hasWatchSleepData && !viewModel.isLoading {
+            CompactGlassCard(cornerRadius: 16) {
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                RadialGradient(
+                                    colors: [CelleuxColors.silverLight.opacity(0.2), CelleuxColors.silverLight.opacity(0.05)],
+                                    center: .center,
+                                    startRadius: 0,
+                                    endRadius: 18
+                                )
+                            )
+                            .frame(width: 36, height: 36)
+                        Image(systemName: "applewatch")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(CelleuxColors.silverGradient)
+                    }
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Connect Apple Watch")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(CelleuxColors.textPrimary)
+                        Text("For personalized timing based on your sleep schedule")
+                            .font(.system(size: 11, weight: .regular))
+                            .foregroundStyle(CelleuxColors.textLabel)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(CelleuxColors.textLabel)
+                }
+            }
+            .staggeredAppear(appeared: appeared, delay: 0)
         }
     }
 
@@ -66,10 +122,23 @@ struct CircadianTimingView: View {
                             .tracking(1.5)
                     }
                     Spacer()
-                    Text("\(viewModel.completedCount) of \(viewModel.totalCount)")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(CelleuxColors.warmGold)
-                        .contentTransition(.numericText())
+
+                    if viewModel.weeklyAdherencePercent > 0 {
+                        HStack(spacing: 4) {
+                            Text("\(viewModel.weeklyAdherencePercent)%")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(CelleuxColors.warmGold)
+                                .contentTransition(.numericText())
+                            Text("this week")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(CelleuxColors.textLabel)
+                        }
+                    } else {
+                        Text("\(viewModel.completedCount) of \(viewModel.totalCount)")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(CelleuxColors.warmGold)
+                            .contentTransition(.numericText())
+                    }
                 }
 
                 ZStack {
@@ -81,41 +150,32 @@ struct CircadianTimingView: View {
                 completionProgressBar
 
                 if viewModel.isWeekendMode {
-                    HStack(spacing: 6) {
-                        Image(systemName: "moon.zzz.fill")
-                            .font(.system(size: 11))
-                            .foregroundStyle(CelleuxColors.warmGold)
-                        Text("Weekend mode active — timings shifted later")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(CelleuxColors.textSecondary)
-                    }
-                    .padding(.vertical, 6)
-                    .padding(.horizontal, 12)
-                    .background(
-                        Capsule()
-                            .fill(CelleuxColors.warmGold.opacity(0.08))
-                    )
+                    statusPill(icon: "moon.zzz.fill", text: "Weekend mode active — timings shifted later", color: CelleuxColors.warmGold)
                 }
 
                 if viewModel.workoutDetectedToday {
-                    HStack(spacing: 6) {
-                        Image(systemName: "figure.run")
-                            .font(.system(size: 11))
-                            .foregroundStyle(Color(.displayP3, red: 0.3, green: 0.7, blue: 0.4))
-                        Text("Workout detected — post-workout dose adjusted")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(CelleuxColors.textSecondary)
-                    }
-                    .padding(.vertical, 6)
-                    .padding(.horizontal, 12)
-                    .background(
-                        Capsule()
-                            .fill(Color(.displayP3, red: 0.3, green: 0.7, blue: 0.4).opacity(0.08))
-                    )
+                    statusPill(icon: "figure.run", text: "Workout detected — post-workout dose adjusted", color: Color(.displayP3, red: 0.3, green: 0.7, blue: 0.4))
                 }
             }
         }
         .staggeredAppear(appeared: appeared, delay: 0)
+    }
+
+    private func statusPill(icon: String, text: String, color: Color) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 11))
+                .foregroundStyle(color)
+            Text(text)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(CelleuxColors.textSecondary)
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 12)
+        .background(
+            Capsule()
+                .fill(color.opacity(0.08))
+        )
     }
 
     private var circadianClockFace: some View {
@@ -226,6 +286,124 @@ struct CircadianTimingView: View {
         .frame(height: 5)
     }
 
+    // MARK: - Streak Section
+
+    @ViewBuilder
+    private var streakSection: some View {
+        if viewModel.streakDays > 0 {
+            let milestone = StreakMilestone.current(for: viewModel.streakDays)
+
+            ZStack {
+                GlassCard(depth: .elevated) {
+                    VStack(spacing: 14) {
+                        HStack(spacing: 14) {
+                            ZStack {
+                                Circle()
+                                    .fill(RadialGradient(colors: [CelleuxColors.warmGold.opacity(0.15), CelleuxColors.warmGold.opacity(0.03)], center: .center, startRadius: 0, endRadius: 26))
+                                    .frame(width: 50, height: 50)
+                                Circle()
+                                    .stroke(AngularGradient(colors: [CelleuxColors.warmGold.opacity(0.6), CelleuxColors.warmGold.opacity(0.15), CelleuxColors.warmGold.opacity(0.45)], center: .center), lineWidth: 1)
+                                    .frame(width: 50, height: 50)
+                                Image(systemName: "flame.fill")
+                                    .font(.system(size: 20, weight: .light))
+                                    .foregroundStyle(LinearGradient(colors: [CelleuxColors.roseGold, CelleuxColors.warmGold], startPoint: .top, endPoint: .bottom))
+                                    .symbolEffect(.breathe, isActive: appeared)
+                            }
+                            .shadow(color: CelleuxColors.warmGold.opacity(0.2), radius: 8, x: 0, y: 4)
+                            .scaleEffect(milestoneCelebration ? 1.15 : 1.0)
+                            .animation(CelleuxSpring.bouncy, value: milestoneCelebration)
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                                    Text("\(viewModel.streakDays)")
+                                        .font(.system(size: 28, weight: .bold))
+                                        .foregroundStyle(CelleuxColors.goldGradient)
+                                        .contentTransition(.numericText())
+                                    Text("day streak")
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundStyle(CelleuxColors.textPrimary)
+                                }
+                                Text("Consistency is the real anti-aging secret")
+                                    .font(.system(size: 11, weight: .regular))
+                                    .foregroundStyle(CelleuxColors.textLabel)
+                            }
+                            Spacer()
+                        }
+
+                        VStack(spacing: 6) {
+                            GeometryReader { geo in
+                                ZStack(alignment: .leading) {
+                                    Capsule()
+                                        .fill(CelleuxColors.silver.opacity(0.1))
+                                        .frame(height: 5)
+
+                                    Capsule()
+                                        .fill(CelleuxColors.goldGradient)
+                                        .frame(width: geo.size.width * milestone.progress, height: 5)
+                                        .shadow(color: CelleuxColors.warmGold.opacity(0.4), radius: 4)
+                                        .animation(CelleuxSpring.luxury, value: milestone.progress)
+                                }
+                            }
+                            .frame(height: 5)
+
+                            HStack {
+                                Text("\(milestone.daysRemaining) days to \(milestone.next)-day milestone")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(CelleuxColors.textLabel)
+                                Spacer()
+                                Text("\(Int(milestone.progress * 100))%")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(CelleuxColors.warmGold)
+                                    .contentTransition(.numericText())
+                            }
+                        }
+                    }
+                }
+
+                if milestoneCelebration {
+                    CelebrationParticleBurst(isActive: milestoneCelebration)
+                        .allowsHitTesting(false)
+                }
+            }
+            .sensoryFeedback(.notification(.success), trigger: milestoneCelebration)
+            .staggeredAppear(appeared: appeared, delay: 0.04)
+        }
+    }
+
+    // MARK: - Breathing Timer
+
+    @ViewBuilder
+    private var breathingTimerSection: some View {
+        if viewModel.breathingTimerActive {
+            BreathingTimerView(
+                countdown: viewModel.breathingCountdown,
+                onTick: {
+                    viewModel.tickBreathingCountdown()
+                },
+                onComplete: {
+                    if let category = viewModel.breathingTimerCategory,
+                       let item = viewModel.scheduleItems.first(where: { $0.category == category && !$0.isCompleted }) {
+                        viewModel.toggleCompletion(item: item, modelContext: modelContext)
+                        toggleTrigger.toggle()
+                        completionCelebration += 1
+                    }
+                    withAnimation(CelleuxSpring.snappy) {
+                        viewModel.stopBreathingTimer()
+                    }
+                },
+                onDismiss: {
+                    withAnimation(CelleuxSpring.snappy) {
+                        viewModel.stopBreathingTimer()
+                    }
+                }
+            )
+            .transition(.asymmetric(
+                insertion: .scale(scale: 0.9).combined(with: .opacity),
+                removal: .scale(scale: 0.95).combined(with: .opacity)
+            ))
+        }
+    }
+
     // MARK: - Countdown Banner
 
     @ViewBuilder
@@ -267,6 +445,31 @@ struct CircadianTimingView: View {
                 }
             }
             .staggeredAppear(appeared: appeared, delay: 0.06)
+        }
+    }
+
+    // MARK: - Empty Ritual Prompt
+
+    @ViewBuilder
+    private var emptyRitualPrompt: some View {
+        if viewModel.completedCount == 0 && !viewModel.isLoading && !viewModel.breathingTimerActive {
+            CompactGlassCard(cornerRadius: 16) {
+                HStack(spacing: 12) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(CelleuxColors.warmGold)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Start your ritual")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(CelleuxColors.textPrimary)
+                        Text("Complete a dose to build momentum today")
+                            .font(.system(size: 11, weight: .regular))
+                            .foregroundStyle(CelleuxColors.textLabel)
+                    }
+                    Spacer()
+                }
+            }
+            .staggeredAppear(appeared: appeared, delay: 0.08)
         }
     }
 
@@ -470,7 +673,31 @@ struct CircadianTimingView: View {
 
                 Spacer()
 
-                if !item.isCompleted {
+                if item.isActive && !item.isCompleted && !viewModel.breathingTimerActive {
+                    Button {
+                        withAnimation(CelleuxSpring.luxury) {
+                            viewModel.startBreathingTimer(for: item.category)
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "wind")
+                                .font(.system(size: 10, weight: .medium))
+                            Text("Start Ritual")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                        .foregroundStyle(CelleuxColors.warmGold)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule()
+                                .fill(CelleuxColors.warmGold.opacity(0.1))
+                        )
+                        .overlay(
+                            Capsule()
+                                .stroke(CelleuxColors.warmGold.opacity(0.3), lineWidth: 0.5)
+                        )
+                    }
+                } else if !item.isCompleted {
                     Text("Swipe left to complete")
                         .font(.system(size: 9, weight: .medium))
                         .foregroundStyle(CelleuxColors.textLabel.opacity(0.6))
@@ -653,4 +880,3 @@ struct CircadianTimingView: View {
         .presentationCornerRadius(32)
     }
 }
-

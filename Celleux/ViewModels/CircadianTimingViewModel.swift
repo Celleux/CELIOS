@@ -54,6 +54,14 @@ final class CircadianTimingViewModel {
     var weekendModeEnabled: Bool = UserDefaults.standard.bool(forKey: "weekendModeEnabled")
     var weekendExtraMinutes: Int = UserDefaults.standard.integer(forKey: "weekendExtraMinutes") == 0 ? 60 : UserDefaults.standard.integer(forKey: "weekendExtraMinutes")
 
+    var streakDays: Int = 0
+    var weeklyAdherencePercent: Int = 0
+    var hasWatchSleepData: Bool = false
+    var breathingTimerActive: Bool = false
+    var breathingTimerCategory: String? = nil
+    var breathingCountdown: Int = 30
+    var isMilestoneStreak: Bool = false
+
     var nextDoseCountdown: String? {
         let now = Date()
         guard let nextItem = scheduleItems.first(where: { $0.isUpcoming }) else { return nil }
@@ -133,6 +141,8 @@ final class CircadianTimingViewModel {
         await applyAdaptiveAdjustments(modelContext: modelContext)
         generateSchedule()
         loadTodayCompletions(modelContext: modelContext)
+        loadStreak()
+        loadWeeklyAdherence(modelContext: modelContext)
 
         isLoading = false
     }
@@ -140,6 +150,10 @@ final class CircadianTimingViewModel {
     private func applyHealthKitSchedule() {
         let schedule = healthService.sleepSchedule
         let calendar = Calendar.current
+
+        let hasWake = schedule.wakeHour != nil && schedule.wakeMinute != nil
+        let hasSleep = schedule.sleepHour != nil && schedule.sleepMinute != nil
+        hasWatchSleepData = hasWake || hasSleep
 
         if let wakeH = schedule.wakeHour, let wakeM = schedule.wakeMinute {
             if let date = calendar.date(from: DateComponents(hour: wakeH, minute: wakeM)) {
@@ -384,6 +398,54 @@ final class CircadianTimingViewModel {
         }
 
         UserDefaults.standard.set(streak, forKey: "adherenceStreak")
+        let previousStreak = streakDays
+        streakDays = streak
+        checkMilestoneCelebration(previous: previousStreak, current: streak)
+    }
+
+    private func loadStreak() {
+        streakDays = UserDefaults.standard.integer(forKey: "adherenceStreak")
+    }
+
+    private func loadWeeklyAdherence(modelContext: ModelContext) {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let sevenDaysAgo = calendar.date(byAdding: .day, value: -6, to: today) ?? today
+
+        let predicate = #Predicate<SupplementDose> { dose in
+            dose.date >= sevenDaysAgo && dose.isCompleted
+        }
+        let descriptor = FetchDescriptor<SupplementDose>(predicate: predicate)
+        let completedCount = (try? modelContext.fetchCount(descriptor)) ?? 0
+        let totalPossible = 7 * 4
+        weeklyAdherencePercent = totalPossible > 0 ? min(100, (completedCount * 100) / totalPossible) : 0
+    }
+
+    private func checkMilestoneCelebration(previous: Int, current: Int) {
+        let milestones = [7, 14, 30, 60, 90]
+        for m in milestones {
+            if previous < m && current >= m {
+                isMilestoneStreak = true
+                return
+            }
+        }
+    }
+
+    func startBreathingTimer(for category: String) {
+        breathingTimerCategory = category
+        breathingTimerActive = true
+        breathingCountdown = 30
+    }
+
+    func stopBreathingTimer() {
+        breathingTimerActive = false
+        breathingTimerCategory = nil
+        breathingCountdown = 30
+    }
+
+    func tickBreathingCountdown() {
+        guard breathingCountdown > 0 else { return }
+        breathingCountdown -= 1
     }
 
     func scheduleNotifications() {
