@@ -483,8 +483,8 @@ final class SkinHealthCorrelationService {
         let ssRes = zip(xs, ys).map { x, y in
             let predicted = slope * x + intercept
             return (y - predicted) * (y - predicted)
-        }.reduce(0, +)
-        let r2 = ssTot > 0 ? 1 - ssRes / ssTot : 0
+        }.reduce(0.0, +)
+        let r2: Double = ssTot > 0 ? 1.0 - ssRes / ssTot : 0.0
         return (slope, intercept, r2)
     }
 

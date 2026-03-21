@@ -378,8 +378,6 @@ final class HomeViewModel {
         let morningH = wakeH
         let morningM = wakeM + 30
         let eveningMinutes = max(0, sleepH * 60 - 90)
-
-        let today = calendar.startOfDay(for: Date())
         let morningDate = calendar.date(byAdding: DateComponents(hour: morningH, minute: morningM % 60), to: today)
         let middayDate = calendar.date(byAdding: DateComponents(hour: 12, minute: 30), to: today)
         let eveningDate = calendar.date(byAdding: DateComponents(hour: eveningMinutes / 60, minute: eveningMinutes % 60), to: today)
