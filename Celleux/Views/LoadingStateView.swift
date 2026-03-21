@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct GoldSkeletonCard: View {
-    @Environment(\.colorScheme) private var colorScheme
     let style: SkeletonStyle
 
     enum SkeletonStyle {
@@ -95,7 +94,7 @@ struct GoldSkeletonCard: View {
                 .padding(16)
                 .background(
                     RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .fill(colorScheme == .dark ? Color.white.opacity(0.06) : Color.white.opacity(0.85))
+                        .fill(Color.white.opacity(0.85))
                 )
             }
         }
@@ -176,9 +175,7 @@ struct GoldSkeletonCard: View {
     }
 
     private var skeletonFill: Color {
-        colorScheme == .dark
-            ? Color.white.opacity(0.08)
-            : Color(.displayP3, red: 0.88, green: 0.86, blue: 0.82).opacity(0.4)
+        Color(.displayP3, red: 0.88, green: 0.86, blue: 0.82).opacity(0.4)
     }
 }
 

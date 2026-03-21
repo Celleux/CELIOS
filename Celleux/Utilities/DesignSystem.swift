@@ -1,55 +1,5 @@
 import SwiftUI
 
-// MARK: - Appearance Manager
-
-@Observable
-class AppearanceManager {
-    static let shared = AppearanceManager()
-
-    var appearanceMode: AppearanceMode {
-        didSet {
-            UserDefaults.standard.set(appearanceMode.rawValue, forKey: "celleuxAppearanceMode")
-        }
-    }
-
-    var colorScheme: ColorScheme? {
-        switch appearanceMode {
-        case .system: nil
-        case .light: .light
-        case .dark: .dark
-        }
-    }
-
-    private init() {
-        let raw = UserDefaults.standard.string(forKey: "celleuxAppearanceMode") ?? AppearanceMode.system.rawValue
-        self.appearanceMode = AppearanceMode(rawValue: raw) ?? .system
-    }
-}
-
-nonisolated enum AppearanceMode: String, CaseIterable, Identifiable {
-    case system
-    case light
-    case dark
-
-    var id: String { rawValue }
-
-    var label: String {
-        switch self {
-        case .system: "System"
-        case .light: "Light"
-        case .dark: "Dark"
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .system: "circle.lefthalf.filled"
-        case .light: "sun.max.fill"
-        case .dark: "moon.fill"
-        }
-    }
-}
-
 // MARK: - Typography System
 
 enum CelleuxType {
@@ -194,13 +144,6 @@ enum CelleuxColors {
 
     static let glassBackground = Color.white.opacity(0.92)
     static let glassBorder = Color.white.opacity(0.8)
-
-    // MARK: - Dark Mode Colors
-    static let charcoal = Color(.displayP3, red: 0.102, green: 0.102, blue: 0.149)
-    static let darkCardSurface = Color.white.opacity(0.08)
-    static let darkDepthLayer = Color.white.opacity(0.04)
-    static let darkGlassBorder = Color.white.opacity(0.12)
-    static let darkSilverLight = Color(.displayP3, red: 0.88, green: 0.90, blue: 0.93)
 
     static let silverGradient = LinearGradient(
         colors: [Color(.displayP3, red: 0.816, green: 0.847, blue: 0.878), Color(.displayP3, red: 0.627, green: 0.659, blue: 0.69)],
@@ -396,20 +339,16 @@ extension Color {
 }
 
 struct CelleuxMeshBackground: View {
-    @Environment(\.colorScheme) private var colorScheme
-
     var body: some View {
         ZStack {
-            (colorScheme == .dark ? CelleuxColors.charcoal : Color(.displayP3, red: 0.97, green: 0.96, blue: 0.94))
+            Color(.displayP3, red: 0.97, green: 0.96, blue: 0.94)
                 .ignoresSafeArea()
 
             Circle()
                 .fill(
                     RadialGradient(
                         colors: [
-                            colorScheme == .dark
-                                ? CelleuxColors.warmGold.opacity(0.08)
-                                : Color(.displayP3, red: 0.92, green: 0.88, blue: 0.80).opacity(0.3),
+                            Color(.displayP3, red: 0.92, green: 0.88, blue: 0.80).opacity(0.3),
                             Color.clear
                         ],
                         center: .topLeading,
@@ -425,9 +364,7 @@ struct CelleuxMeshBackground: View {
                 .fill(
                     RadialGradient(
                         colors: [
-                            colorScheme == .dark
-                                ? Color(.displayP3, red: 0.85, green: 0.86, blue: 0.90).opacity(0.06)
-                                : Color(.displayP3, red: 0.85, green: 0.86, blue: 0.90).opacity(0.2),
+                            Color(.displayP3, red: 0.85, green: 0.86, blue: 0.90).opacity(0.2),
                             Color.clear
                         ],
                         center: .bottomTrailing,
@@ -506,7 +443,6 @@ struct AmbientParticle {
 }
 
 struct GlassCard<Content: View>: View {
-    @Environment(\.colorScheme) private var colorScheme
     let cornerRadius: CGFloat
     let depth: GlassDepth
     let showShimmer: Bool
@@ -519,56 +455,29 @@ struct GlassCard<Content: View>: View {
         self.content = content()
     }
 
-    private var chromeBorder: AngularGradient {
-        if colorScheme == .dark {
-            return AngularGradient(
-                colors: [
-                    Color.white.opacity(0.12),
-                    CelleuxColors.warmGold.opacity(0.2),
-                    Color.white.opacity(0.08),
-                    CelleuxColors.warmGold.opacity(0.15),
-                    Color.white.opacity(0.12)
-                ],
-                center: .center
-            )
-        }
-        return AngularGradient(
-            colors: [
-                CelleuxColors.silverLight.opacity(0.6),
-                CelleuxColors.warmGold.opacity(0.4),
-                Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.8),
-                CelleuxColors.silverBorder.opacity(0.5),
-                CelleuxColors.champagneGold.opacity(0.35),
-                Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.7),
-                CelleuxColors.silverLight.opacity(0.6)
-            ],
-            center: .center
-        )
-    }
+    private static let chromeBorder = AngularGradient(
+        colors: [
+            CelleuxColors.silverLight.opacity(0.6),
+            CelleuxColors.warmGold.opacity(0.4),
+            Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.8),
+            CelleuxColors.silverBorder.opacity(0.5),
+            CelleuxColors.champagneGold.opacity(0.35),
+            Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.7),
+            CelleuxColors.silverLight.opacity(0.6)
+        ],
+        center: .center
+    )
 
-    private var innerHighlight: LinearGradient {
-        if colorScheme == .dark {
-            return LinearGradient(
-                colors: [Color.white.opacity(0.06), Color.clear],
-                startPoint: .top,
-                endPoint: .center
-            )
-        }
-        return LinearGradient(
-            colors: [
-                Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.15),
-                Color.clear
-            ],
-            startPoint: .top,
-            endPoint: .center
-        )
-    }
+    private static let innerHighlight = LinearGradient(
+        colors: [
+            Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.15),
+            Color.clear
+        ],
+        startPoint: .top,
+        endPoint: .center
+    )
 
-    private var cardFill: Color {
-        colorScheme == .dark
-            ? Color.white.opacity(0.08)
-            : Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.92)
-    }
+    private static let cardFill = Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.92)
 
     var body: some View {
         content
@@ -576,14 +485,14 @@ struct GlassCard<Content: View>: View {
             .background(
                 ZStack {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(cardFill)
+                        .fill(Self.cardFill)
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(innerHighlight)
+                        .fill(Self.innerHighlight)
                 }
             )
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(chromeBorder, lineWidth: 1)
+                    .stroke(Self.chromeBorder, lineWidth: 1)
             )
             .overlay {
                 if showShimmer {
@@ -633,7 +542,6 @@ nonisolated enum GlassDepth {
 }
 
 struct CompactGlassCard<Content: View>: View {
-    @Environment(\.colorScheme) private var colorScheme
     let cornerRadius: CGFloat
     let content: Content
 
@@ -642,29 +550,27 @@ struct CompactGlassCard<Content: View>: View {
         self.content = content()
     }
 
-    private var chromeBorder: AngularGradient {
-        if colorScheme == .dark {
-            return AngularGradient(
-                colors: [
-                    Color.white.opacity(0.10),
-                    CelleuxColors.warmGold.opacity(0.15),
-                    Color.white.opacity(0.06),
-                    Color.white.opacity(0.10)
-                ],
-                center: .center
-            )
-        }
-        return AngularGradient(
-            colors: [
-                CelleuxColors.silverLight.opacity(0.5),
-                CelleuxColors.warmGold.opacity(0.3),
-                Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.7),
-                CelleuxColors.silverBorder.opacity(0.4),
-                CelleuxColors.silverLight.opacity(0.5)
-            ],
-            center: .center
-        )
-    }
+    private static let chromeBorder = AngularGradient(
+        colors: [
+            CelleuxColors.silverLight.opacity(0.5),
+            CelleuxColors.warmGold.opacity(0.3),
+            Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.7),
+            CelleuxColors.silverBorder.opacity(0.4),
+            CelleuxColors.silverLight.opacity(0.5)
+        ],
+        center: .center
+    )
+
+    private static let cardFill = Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.92)
+
+    private static let cardHighlight = LinearGradient(
+        colors: [
+            Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.12),
+            Color.clear
+        ],
+        startPoint: .top,
+        endPoint: .center
+    )
 
     var body: some View {
         content
@@ -672,23 +578,14 @@ struct CompactGlassCard<Content: View>: View {
             .background(
                 ZStack {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.92))
+                        .fill(Self.cardFill)
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    colorScheme == .dark ? Color.white.opacity(0.04) : Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.12),
-                                    Color.clear
-                                ],
-                                startPoint: .top,
-                                endPoint: .center
-                            )
-                        )
+                        .fill(Self.cardHighlight)
                 }
             )
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(chromeBorder, lineWidth: 1)
+                    .stroke(Self.chromeBorder, lineWidth: 1)
             )
             .celleuxDepthShadow()
     }
@@ -705,7 +602,6 @@ struct PressableButtonStyle: ButtonStyle {
 
 struct GlassButtonStyle: ButtonStyle {
     let style: GlassButtonVariant
-    @Environment(\.colorScheme) private var colorScheme
 
     init(style: GlassButtonVariant = .primary) {
         self.style = style
@@ -720,7 +616,7 @@ struct GlassButtonStyle: ButtonStyle {
             .background(
                 ZStack {
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.95))
+                        .fill(Color.white.opacity(0.95))
 
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .stroke(
@@ -801,30 +697,22 @@ enum GlassButtonVariant {
 }
 
 struct Premium3DButtonStyle: ButtonStyle {
-    @Environment(\.colorScheme) private var colorScheme
-
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .background(
                 ZStack {
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(colorScheme == .dark ? Color.white.opacity(0.06) : Color.white.opacity(0.5))
+                        .fill(Color.white.opacity(0.5))
                         .offset(y: configuration.isPressed ? 1 : 3)
                         .blur(radius: 0.5)
 
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.95))
+                        .fill(Color.white.opacity(0.95))
 
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .stroke(
                             AngularGradient(
-                                colors: colorScheme == .dark ? [
-                                    Color.white.opacity(0.15),
-                                    CelleuxColors.warmGold.opacity(0.3),
-                                    Color.white.opacity(0.08),
-                                    CelleuxColors.warmGold.opacity(0.2),
-                                    Color.white.opacity(0.15)
-                                ] : [
+                                colors: [
                                     Color.white.opacity(0.95),
                                     CelleuxColors.warmGold.opacity(0.6),
                                     CelleuxP3.coolSilver.opacity(0.45),
@@ -850,17 +738,15 @@ struct Premium3DButtonStyle: ButtonStyle {
 }
 
 struct OutlineGlassButtonStyle: ButtonStyle {
-    @Environment(\.colorScheme) private var colorScheme
-
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .background(
                 ZStack {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.92))
+                        .fill(Color.white.opacity(0.92))
 
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(colorScheme == .dark ? AnyShapeStyle(Color.white.opacity(0.12)) : AnyShapeStyle(CelleuxColors.glassEdgeHighlight), lineWidth: 1)
+                        .stroke(CelleuxColors.glassEdgeHighlight, lineWidth: 1)
                 }
             )
             .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 3)
@@ -1102,7 +988,6 @@ extension View {
 }
 
 struct ChromeIconBadge: View {
-    @Environment(\.colorScheme) private var colorScheme
     let systemName: String
     let size: CGFloat
     let gradientStyle: LinearGradient
@@ -1116,18 +1001,18 @@ struct ChromeIconBadge: View {
     var body: some View {
         ZStack {
             Circle()
-                .fill(colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.9))
+                .fill(Color.white.opacity(0.9))
                 .frame(width: size, height: size)
 
             Circle()
-                .stroke(colorScheme == .dark ? AnyShapeStyle(Color.white.opacity(0.08)) : AnyShapeStyle(CelleuxColors.iconHighlightGradient), lineWidth: 1.5)
+                .stroke(CelleuxColors.iconHighlightGradient, lineWidth: 1.5)
                 .frame(width: size, height: size)
 
             Image(systemName: systemName)
                 .font(.system(size: size * 0.38, weight: .medium))
                 .foregroundStyle(gradientStyle)
         }
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0.3 : 0.08), radius: 6, x: 0, y: 3)
+        .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
         .accessibilityHidden(true)
     }
 }
@@ -1153,7 +1038,6 @@ struct PremiumDivider: View {
 }
 
 struct GlowingAccentBadge: View {
-    @Environment(\.colorScheme) private var colorScheme
     let systemName: String
     let color: Color
     let size: CGFloat
@@ -1167,11 +1051,11 @@ struct GlowingAccentBadge: View {
     var body: some View {
         ZStack {
             Circle()
-                .fill(colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.9))
+                .fill(Color.white.opacity(0.9))
                 .frame(width: size, height: size)
 
             Circle()
-                .stroke(colorScheme == .dark ? AnyShapeStyle(Color.white.opacity(0.08)) : AnyShapeStyle(CelleuxColors.iconHighlightGradient), lineWidth: 1.5)
+                .stroke(CelleuxColors.iconHighlightGradient, lineWidth: 1.5)
                 .frame(width: size, height: size)
 
             Image(systemName: systemName)
@@ -1184,7 +1068,7 @@ struct GlowingAccentBadge: View {
                     )
                 )
         }
-        .shadow(color: color.opacity(colorScheme == .dark ? 0.4 : 0.25), radius: 8, x: 0, y: 4)
+        .shadow(color: color.opacity(0.25), radius: 8, x: 0, y: 4)
         .accessibilityHidden(true)
     }
 }

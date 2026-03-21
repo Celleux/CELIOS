@@ -4,7 +4,6 @@ import SwiftData
 @main
 struct CelleuxApp: App {
     @State private var hasCompletedOnboarding: Bool = UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
-    @State private var appearanceManager = AppearanceManager.shared
 
     var body: some Scene {
         WindowGroup {
@@ -28,7 +27,7 @@ struct CelleuxApp: App {
                         })
                 }
             }
-            .preferredColorScheme(appearanceManager.colorScheme)
+            .preferredColorScheme(.light)
         }
         .modelContainer(for: [
             UserProfile.self,

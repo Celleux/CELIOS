@@ -76,7 +76,6 @@ enum ErrorStateType {
 }
 
 struct ErrorStateView: View {
-    @Environment(\.colorScheme) private var colorScheme
     let type: ErrorStateType
     let action: () -> Void
     var secondaryAction: (() -> Void)? = nil
@@ -173,7 +172,6 @@ struct ErrorStateView: View {
 }
 
 struct ScanErrorBanner: View {
-    @Environment(\.colorScheme) private var colorScheme
     let message: String
     let icon: String
     let onDismiss: () -> Void
@@ -186,7 +184,7 @@ struct ScanErrorBanner: View {
 
             Text(message)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(colorScheme == .dark ? .white : CelleuxColors.textPrimary)
+                .foregroundStyle(CelleuxColors.textPrimary)
                 .lineLimit(2)
 
             Spacer()
@@ -196,14 +194,14 @@ struct ScanErrorBanner: View {
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(colorScheme == .dark ? .white.opacity(0.4) : CelleuxColors.textLabel)
+                    .foregroundStyle(CelleuxColors.textLabel)
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.95))
+                .fill(Color.white.opacity(0.95))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)

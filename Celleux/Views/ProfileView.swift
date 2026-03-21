@@ -619,8 +619,6 @@ struct SettingsSheet: View {
     @Binding var supplementReminders: Bool
     @Binding var weeklySummary: Bool
     @Binding var achievementAlerts: Bool
-    @State private var appearanceManager = AppearanceManager.shared
-
     @State private var editName: String = ""
     @State private var editSkinType: FitzpatrickType? = nil
     @State private var lightingSensitivity: String = UserDefaults.standard.string(forKey: "lightingSensitivity") ?? "Normal"
@@ -636,7 +634,6 @@ struct SettingsSheet: View {
         NavigationStack {
             List {
                 personalInfoSection
-                appearanceSection
                 scanSettingsSection
                 notificationsSection
                 healthConnectionsSection
@@ -700,27 +697,6 @@ struct SettingsSheet: View {
             }
         } header: {
             Text("Personal Info")
-        }
-    }
-
-    // MARK: - Appearance
-
-    private var appearanceSection: some View {
-        Section {
-            Picker(selection: $appearanceManager.appearanceMode) {
-                ForEach(AppearanceMode.allCases) { mode in
-                    Label(mode.label, systemImage: mode.icon)
-                        .tag(mode)
-                }
-            } label: {
-                Label("Appearance", systemImage: "circle.lefthalf.filled")
-            }
-            .pickerStyle(.inline)
-            .onChange(of: appearanceManager.appearanceMode) { _, _ in
-                hapticTrigger += 1
-            }
-        } header: {
-            Text("Appearance")
         }
     }
 

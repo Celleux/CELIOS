@@ -6,7 +6,6 @@ struct HomeView: View {
     var switchTab: (AppTab) -> Void
     @State private var viewModel = HomeViewModel()
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.colorScheme) private var colorScheme
     @State private var appeared: Bool = false
     @State private var scoreAnimated: Bool = false
     @State private var ringGlow: Bool = false
@@ -180,11 +179,11 @@ struct HomeView: View {
                 .padding(.vertical, 7)
                 .background(
                     Capsule()
-                        .fill(colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.95))
+                        .fill(Color.white.opacity(0.95))
                 )
                 .overlay(
                     Capsule()
-                        .stroke(colorScheme == .dark ? Color.white.opacity(0.12) : Color.white.opacity(0.6), lineWidth: 1)
+                        .stroke(Color.white.opacity(0.6), lineWidth: 1)
                 )
                 .shadow(color: .black.opacity(0.06), radius: 6, x: 0, y: 2)
             }
@@ -211,11 +210,11 @@ struct HomeView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.92))
+                .fill(Color.white.opacity(0.92))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(colorScheme == .dark ? AnyShapeStyle(Color.white.opacity(0.12)) : AnyShapeStyle(CelleuxColors.glassEdgeHighlight), lineWidth: 1)
+                .stroke(CelleuxColors.glassEdgeHighlight, lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 3)
     }
@@ -382,12 +381,12 @@ struct HomeView: View {
     private var heroCardBackground: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.92))
+                .fill(Color.white.opacity(0.92))
             RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .stroke(colorScheme == .dark ? AnyShapeStyle(Color.white.opacity(0.12)) : AnyShapeStyle(CelleuxColors.glassEdgeHighlight), lineWidth: 1)
+                .stroke(CelleuxColors.glassEdgeHighlight, lineWidth: 1)
         }
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0.3 : 0.06), radius: 12, x: 0, y: 6)
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0.15 : 0.03), radius: 30, x: 0, y: 15)
+        .shadow(color: .black.opacity(0.06), radius: 12, x: 0, y: 6)
+        .shadow(color: .black.opacity(0.03), radius: 30, x: 0, y: 15)
     }
 
     // MARK: - 3. Longevity Composite Card
@@ -728,11 +727,11 @@ struct HomeView: View {
                         .blur(radius: 6)
 
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.95))
+                        .fill(Color.white.opacity(0.95))
                         .frame(width: 56, height: 56)
 
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(colorScheme == .dark ? AnyShapeStyle(Color.white.opacity(0.08)) : AnyShapeStyle(CelleuxColors.iconHighlightGradient), lineWidth: 1.5)
+                        .stroke(CelleuxColors.iconHighlightGradient, lineWidth: 1.5)
                         .frame(width: 56, height: 56)
 
                     Image(systemName: icon)
@@ -748,11 +747,11 @@ struct HomeView: View {
             .padding(.vertical, 14)
             .background(
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.92))
+                    .fill(Color.white.opacity(0.92))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .stroke(colorScheme == .dark ? AnyShapeStyle(Color.white.opacity(0.12)) : AnyShapeStyle(CelleuxColors.glassEdgeHighlight), lineWidth: 1)
+                    .stroke(CelleuxColors.glassEdgeHighlight, lineWidth: 1)
             )
             .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 4)
         }
@@ -843,11 +842,11 @@ struct HomeView: View {
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.92))
+                .fill(Color.white.opacity(0.92))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(colorScheme == .dark ? AnyShapeStyle(Color.white.opacity(0.12)) : AnyShapeStyle(CelleuxColors.glassEdgeHighlight), lineWidth: 1)
+                .stroke(CelleuxColors.glassEdgeHighlight, lineWidth: 1)
         )
         .celleuxDepthShadow()
     }
@@ -888,11 +887,11 @@ struct HomeView: View {
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.92))
+                .fill(Color.white.opacity(0.92))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(colorScheme == .dark ? AnyShapeStyle(Color.white.opacity(0.12)) : AnyShapeStyle(CelleuxColors.glassEdgeHighlight), lineWidth: 1)
+                .stroke(CelleuxColors.glassEdgeHighlight, lineWidth: 1)
         )
         .celleuxDepthShadow()
     }
@@ -1188,11 +1187,11 @@ struct HomeView: View {
                 .padding(18)
                 .background(
                     RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.92))
+                        .fill(Color.white.opacity(0.92))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .stroke(colorScheme == .dark ? AnyShapeStyle(Color.white.opacity(0.12)) : AnyShapeStyle(CelleuxColors.glassEdgeHighlight), lineWidth: 1)
+                        .stroke(CelleuxColors.glassEdgeHighlight, lineWidth: 1)
                 )
                 .celleuxDepthShadow()
 
@@ -1258,11 +1257,11 @@ struct HomeView: View {
             .padding(16)
             .background(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(colorScheme == .dark ? Color.white.opacity(0.06) : Color.white.opacity(0.88))
+                    .fill(Color.white.opacity(0.88))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(colorScheme == .dark ? AnyShapeStyle(Color.white.opacity(0.10)) : AnyShapeStyle(CelleuxColors.glassEdgeHighlight), lineWidth: 1)
+                    .stroke(CelleuxColors.glassEdgeHighlight, lineWidth: 1)
             )
             .celleuxDepthShadow()
         }
@@ -1374,11 +1373,11 @@ struct HomeView: View {
                 .padding(16)
                 .background(
                     RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .fill(colorScheme == .dark ? Color.white.opacity(0.06) : Color.white.opacity(0.88))
+                        .fill(Color.white.opacity(0.88))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .stroke(colorScheme == .dark ? AnyShapeStyle(Color.white.opacity(0.10)) : AnyShapeStyle(CelleuxColors.glassEdgeHighlight), lineWidth: 1)
+                        .stroke(CelleuxColors.glassEdgeHighlight, lineWidth: 1)
                 )
                 .celleuxDepthShadow()
             }
@@ -1885,7 +1884,6 @@ nonisolated enum MoodAssociationOption: String, CaseIterable, Identifiable, Hash
 }
 
 struct ChromeToolbarButton: View {
-    @Environment(\.colorScheme) private var colorScheme
     let icon: String
 
     private static let chromeBorder = AngularGradient(
@@ -1893,26 +1891,21 @@ struct ChromeToolbarButton: View {
         center: .center
     )
 
-    private static let darkChromeBorder = AngularGradient(
-        colors: [Color.white.opacity(0.12), CelleuxColors.warmGold.opacity(0.15), Color.white.opacity(0.08)],
-        center: .center
-    )
-
     var body: some View {
         ZStack {
             Circle()
-                .fill(colorScheme == .dark ? Color.white.opacity(0.10) : Color.white.opacity(0.95))
+                .fill(Color.white.opacity(0.95))
                 .frame(width: 44, height: 44)
             Circle()
-                .stroke(colorScheme == .dark ? AnyShapeStyle(Color.white.opacity(0.08)) : AnyShapeStyle(CelleuxColors.iconHighlightGradient), lineWidth: 1)
+                .stroke(CelleuxColors.iconHighlightGradient, lineWidth: 1)
                 .frame(width: 44, height: 44)
             Circle()
-                .stroke(colorScheme == .dark ? Self.darkChromeBorder : Self.chromeBorder, lineWidth: 0.5)
+                .stroke(Self.chromeBorder, lineWidth: 0.5)
                 .frame(width: 44, height: 44)
             Image(systemName: icon)
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.9) : CelleuxColors.textPrimary)
+                .foregroundStyle(CelleuxColors.textPrimary)
         }
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0.3 : 0.08), radius: 8, x: 0, y: 3)
+        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 3)
     }
 }
