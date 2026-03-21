@@ -40,6 +40,9 @@ struct PersonalizationView: View {
                     genderSection
                         .staggeredAppear(appeared: appeared, delay: 0.25)
 
+                    skinTypeSection
+                        .staggeredAppear(appeared: appeared, delay: 0.3)
+
                     Spacer()
                         .frame(height: 100)
                 }
@@ -204,6 +207,33 @@ struct PersonalizationView: View {
                         ) {
                             withAnimation(CelleuxSpring.snappy) {
                                 viewModel.selectedGender = gender
+                            }
+                            hapticTrigger += 1
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var skinTypeSection: some View {
+        GlassCard(cornerRadius: 20, depth: .subtle) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    sectionLabel("SKIN TYPE")
+                    Text("optional")
+                        .font(.system(size: 10, weight: .regular))
+                        .foregroundStyle(CelleuxColors.textLabel)
+                }
+
+                FlowLayout(spacing: 10) {
+                    ForEach(FitzpatrickType.allCases) { type in
+                        PillButton(
+                            title: "\(type.rawValue) · \(type.label)",
+                            isSelected: viewModel.selectedSkinType == type
+                        ) {
+                            withAnimation(CelleuxSpring.snappy) {
+                                viewModel.selectedSkinType = type
                             }
                             hapticTrigger += 1
                         }

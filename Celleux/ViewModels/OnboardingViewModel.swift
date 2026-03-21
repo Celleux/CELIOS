@@ -15,6 +15,7 @@ final class OnboardingViewModel {
     var selectedGoals: Set<String> = []
     var selectedConcerns: Set<String> = []
     var selectedGender: String? = nil
+    var selectedSkinType: FitzpatrickType? = nil
 
     var healthConnected: Bool = false
     var notificationsEnabled: Bool = false
@@ -50,7 +51,8 @@ final class OnboardingViewModel {
             ageRange: selectedAgeRange ?? "",
             goals: Array(selectedGoals),
             skinConcerns: Array(selectedConcerns),
-            gender: selectedGender ?? ""
+            gender: selectedGender ?? "",
+            skinType: selectedSkinType?.rawValue ?? ""
         )
         modelContext.insert(profile)
         try? modelContext.save()

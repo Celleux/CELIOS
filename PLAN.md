@@ -1,25 +1,69 @@
-# Upgrade Insight Tone & Data Validation Rules
+# Premium Profile & Settings Upgrade
 
-## What's Changing
+## Features
 
-Two focused improvements to the Insights & AI Coach feature:
+### Profile Header Upgrade
+- Enlarged profile header with a **ChromeRingView** showing your all-time best skin score as a gold progress arc
+- Your name, skin type badge (Fitzpatrick classification), and "Member since" date
+- Below the ring: latest scan score displayed as text alongside the best score
+- Total scans, current streak, check-ins, and badges shown as stats
 
----
+### Skin Type (Fitzpatrick) Selection
+- New skin type field added to your profile data
+- New skin type picker added to the **onboarding personalization** step (optional field)
+- Editable from the profile settings sheet as well
+- Displayed as a subtle badge (e.g. "Type III · Medium") next to your name
 
-### **Feature 1: Encouraging, Personal Narrative Tone**
+### Quick Toggles (Inline on Profile)
+- **Supplement Reminders** — toggle on/off directly on the profile page
+- **Weekly Summary** — toggle on/off
+- **Achievement Alerts** — toggle on/off
+- Each toggle uses gold-tinted styling and plays a haptic on change
 
-- **Rewrite all insight messages** to feel warm and encouraging (like Gentler Streak), never clinical or judgmental
-- Every insight will **reference the user's specific data** — e.g. "Your skin responded well to last night's 8.2 hours of sleep" instead of generic "Sleep is good"
-- Every insight will include a **concrete, actionable next step** — e.g. "Try adding 15 minutes to tonight's sleep" instead of "Consider adjusting your routine"
-- Celebration messages will feel genuinely delightful — "You've been on a roll! Your texture just hit a new personal best"
-- Negative trends framed as opportunities — "Your hydration dipped a bit — a glass of water now can help your skin bounce back"
-- Weekly summaries read like a friendly coach recap, not a data report
+### Settings Sheet (Gear Button → Full Settings)
+- **Scan Settings section:**
+  - Lighting sensitivity picker (Strict / Normal / Lenient)
+  - Scan duration picker (Quick 4s / Standard 8s / Thorough 12s)
+  - Calibration reset button with confirmation dialog explaining what gets cleared
+- **Notifications section:**
+  - Supplement reminder time adjustment
+  - Weekly summary and achievement alert toggles (mirrors inline)
+- **Health Connections section:**
+  - HealthKit connection status with green/gray indicator dot
+  - Apple Watch detected status
+  - List of data sources with live status
+- **Data Management section:**
+  - Export scan history — choose between CSV or JSON format
+  - Clear calibration baseline (with confirmation)
+  - Delete all scan photos (existing)
+  - Delete account (existing)
+- **About section:**
+  - App version
+  - "Powered by ARKit + Vision + Core Image" footer
+  - Privacy policy & Terms of service placeholder links
 
-### **Feature 2: Strict Data Validation Rules**
+### Animations & Haptics
+- Section cards animate in with staggered spring entrance (existing pattern)
+- Toggle changes animate with `.symbolEffect(.bounce)`
+- Haptic feedback (`.sensoryFeedback(.selection)`) on every toggle and picker change
+- Settings sheet sections expand/collapse with `CelleuxSpring.luxury`
 
-- **Less than 3 scans**: Only show the "Scan more to unlock insights" prompt — no trend alerts, no celebrations, no correlation discoveries generated
-- **No HealthKit / no Apple Watch**: Skip all health-dependent insights (sleep, HRV, hydration, UV, activity). Show only scan-based insights (trends, celebrations, personal bests)
-- **No supplement tracking data**: Skip adherence-related insights entirely
-- **Mixed availability**: Show whatever insights have real backing data, never fill gaps with defaults or estimates
-- Add a small **"Data Sources" indicator** at the bottom of the insight feed showing which sources are active (Scans ✓, HealthKit ✓, Supplements ✗) so the user understands why certain insights are missing
-- If zero data sources are available, show a friendly empty state with clear next steps to get started
+### Data Persistence
+- All new settings (lighting, scan duration, notification prefs) saved to UserDefaults
+- Skin type saved to UserProfile via SwiftData
+- HealthKit authorization status checked live on appear
+- Real-time connection status indicators (pulsing green dot for connected, gray for disconnected)
+
+## Design
+
+- Profile header: elevated GlassCard with the ChromeRingView centered, gold arc showing best score percentage, score number inside the ring, name and skin type badge below
+- Stats row: four metrics in a horizontal layout with premium dividers (existing style)
+- Quick toggles: compact GlassCard with gold-tinted Toggle switches
+- Settings sheet: presented with `.ultraThinMaterial` background, grouped sections with ChromeIconBadge icons, premium dividers between rows
+- Consistent with existing Celleux luxury aesthetic — warm gold accents, chrome borders, Display P3 colors
+- Calibration reset confirmation: system alert explaining "This will clear your 3-scan baseline. Your next 3 scans will establish a new reference point."
+
+## Screens
+
+- **Profile Page** — scrollable page with: enlarged header (ring + name + skin type), stats row, achievements horizontal scroll, quick notification toggles, health/data/account settings groups, app version footer
+- **Settings Sheet** — gear button opens a sheet with: personal info editing (name, skin type), scan settings (lighting, duration, calibration), notification preferences, health connection status dashboard, data management (export CSV/JSON, clear data, delete account), about section
