@@ -343,6 +343,8 @@ final class CircadianTimingViewModel {
 
             recordCompletionPattern(item: item, modelContext: modelContext)
             updateAdherenceStreak(modelContext: modelContext)
+            AchievementEngine.shared.checkAll(modelContext: modelContext)
+            AchievementEngine.shared.recordChallengeCheckIn(modelContext: modelContext)
         } else {
             let category = item.category
             let predicate = #Predicate<SupplementDose> { dose in

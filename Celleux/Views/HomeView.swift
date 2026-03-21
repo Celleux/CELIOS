@@ -17,6 +17,8 @@ struct HomeView: View {
     @State private var overdueGlow: Bool = false
     @State private var selectedFactor: LongevityFactor? = nil
     @State private var achievementCelebration: Bool = false
+    @State private var showChallengeDetail: Bool = false
+    @Query(filter: #Predicate<SkinTransformationChallenge> { $0.isActive == true }) private var activeChallenges: [SkinTransformationChallenge]
     @Namespace private var heroAnimation
 
     var body: some View {
@@ -48,6 +50,7 @@ struct HomeView: View {
                         quickActionsRow
                         weeklyTrendCard
                         streakAchievementSection
+                        challengeCard
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
@@ -71,6 +74,9 @@ struct HomeView: View {
                         ChromeToolbarButton(icon: "bell")
                     }
                 }
+            }
+            .navigationDestination(isPresented: $showChallengeDetail) {
+                ChallengeDetailView()
             }
             .navigationDestination(isPresented: $showLongevityScore) {
                 SkinLongevityScoreView()
@@ -1259,6 +1265,125 @@ struct HomeView: View {
                     .stroke(CelleuxColors.glassEdgeHighlight, lineWidth: 1)
             )
             .celleuxDepthShadow()
+        }
+    }
+
+    // MARK: - Challenge Card
+
+    @ViewBuilder
+    private var challengeCard: some View {
+        if let challenge = activeChallenges.first {
+            Button {
+                showChallengeDetail = true
+            } label: {
+                GlassCard {
+                    HStack(spacing: 16) {
+                        ZStack {
+                            Circle()
+                                .stroke(CelleuxColors.silver.opacity(0.12), lineWidth: 5)
+                                .frame(width: 64, height: 64)
+
+                            Circle()
+                                .trim(from: 0, to: challenge.progress)
+                                .stroke(
+                                    AngularGradient(
+                                        colors: [CelleuxColors.warmGold.opacity(0.6), CelleuxColors.roseGold, CelleuxColors.warmGold],
+                                        center: .center
+                                    ),
+                                    style: StrokeStyle(lineWidth: 5, lineCap: .round)
+                                )
+                                .frame(width: 64, height: 64)
+                                .rotationEffect(.degrees(-90))
+                                .animation(CelleuxSpring.luxury, value: challenge.progress)
+
+                            VStack(spacing: 0) {
+                                Text("\(challenge.currentDay)")
+                                    .font(.system(size: 20, weight: .light))
+                                    .foregroundStyle(CelleuxColors.textPrimary)
+                                    .contentTransition(.numericText())
+                                Text("/90")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(CelleuxColors.textLabel)
+                            }
+                        }
+
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text("90-DAY CHALLENGE")
+                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .foregroundStyle(CelleuxColors.warmGold)
+                                .tracking(0.8)
+
+                            Text("\(challenge.checkedInDayCount) check-ins \u{2022} \(Int(challenge.progress * 100))% complete")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(CelleuxColors.textPrimary)
+
+                            let target = challenge.currentMilestoneTarget
+                            let daysTo = max(0, target - challenge.daysSinceStart)
+                            Text("\(daysTo) days to \(target)-day milestone")
+                                .font(.system(size: 11, weight: .regular))
+                                .foregroundStyle(CelleuxColors.textLabel)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(CelleuxColors.silver)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .staggeredAppear(appeared: appeared, delay: 0.38)
+        } else {
+            Button {
+                showChallengeDetail = true
+            } label: {
+                HStack(spacing: 14) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                RadialGradient(
+                                    colors: [CelleuxColors.warmGold.opacity(0.1), Color.clear],
+                                    center: .center,
+                                    startRadius: 0,
+                                    endRadius: 28
+                                )
+                            )
+                            .frame(width: 50, height: 50)
+                        Image(systemName: "trophy")
+                            .font(.system(size: 20, weight: .light))
+                            .foregroundStyle(CelleuxColors.warmGold.opacity(0.6))
+                    }
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("90-DAY TRANSFORMATION")
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .foregroundStyle(CelleuxColors.warmGold)
+                            .tracking(0.8)
+                        Text("Start your skin transformation journey")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(CelleuxColors.textSecondary)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(CelleuxColors.silver)
+                }
+                .padding(16)
+                .background(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(Color.white.opacity(0.88))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .stroke(CelleuxColors.glassEdgeHighlight, lineWidth: 1)
+                )
+                .celleuxDepthShadow()
+            }
+            .buttonStyle(.plain)
+            .staggeredAppear(appeared: appeared, delay: 0.38)
         }
     }
 }

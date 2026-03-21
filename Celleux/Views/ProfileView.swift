@@ -45,6 +45,7 @@ struct ProfileView: View {
                     profileHeader
                     statsCard
                     achievementsSection
+                    challengeSection
                     notificationToggles
                     settingsSections
                     appVersionFooter
@@ -284,6 +285,71 @@ struct ProfileView: View {
                 .multilineTextAlignment(.center)
         }
         .frame(width: 82)
+    }
+
+    // MARK: - Challenge Section
+
+    private var challengeSection: some View {
+        VStack(spacing: 12) {
+            HStack {
+                SectionHeader(title: "Challenge")
+                Spacer()
+                NavigationLink(destination: ChallengeDetailView()) {
+                    HStack(spacing: 4) {
+                        Text("View")
+                            .font(.system(size: 13, weight: .medium))
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .foregroundStyle(CelleuxColors.warmGold)
+                }
+            }
+
+            NavigationLink(destination: ChallengeDetailView()) {
+                GlassCard(cornerRadius: 20) {
+                    HStack(spacing: 16) {
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    RadialGradient(
+                                        colors: [CelleuxColors.warmGold.opacity(0.12), Color.clear],
+                                        center: .center,
+                                        startRadius: 0,
+                                        endRadius: 28
+                                    )
+                                )
+                                .frame(width: 52, height: 52)
+                            Image(systemName: "trophy.fill")
+                                .font(.system(size: 22, weight: .light))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [CelleuxColors.roseGold, CelleuxColors.warmGold],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                        }
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("90-Day Skin Transformation")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(CelleuxColors.textPrimary)
+                            Text("Track your journey with milestones & rewards")
+                                .font(.system(size: 12, weight: .regular))
+                                .foregroundStyle(CelleuxColors.textLabel)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(CelleuxColors.silver)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+        }
+        .staggeredAppear(appeared: appeared, delay: 0.20)
     }
 
     // MARK: - Quick Toggles

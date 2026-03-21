@@ -83,6 +83,14 @@ final class AchievementEngine {
         }
     }
 
+    func recordChallengeCheckIn(modelContext: ModelContext) {
+        let predicate = #Predicate<SkinTransformationChallenge> { $0.isActive == true }
+        let descriptor = FetchDescriptor<SkinTransformationChallenge>(predicate: predicate)
+        guard let challenge = try? modelContext.fetch(descriptor).first else { return }
+        challenge.recordCheckIn()
+        try? modelContext.save()
+    }
+
     func recordShare() {
         let current = UserDefaults.standard.integer(forKey: "shareCount")
         UserDefaults.standard.set(current + 1, forKey: "shareCount")

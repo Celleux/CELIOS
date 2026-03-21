@@ -417,6 +417,7 @@ final class SkinScanViewModel {
         UserDefaults.standard.set(Int(analysis.overallScore.rounded()), forKey: "latestSkinScore")
 
         AchievementEngine.shared.checkAll(modelContext: modelContext)
+        AchievementEngine.shared.recordChallengeCheckIn(modelContext: modelContext)
 
         try? modelContext.save()
     }

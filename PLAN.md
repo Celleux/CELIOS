@@ -1,63 +1,56 @@
-# Expanded Achievements System with Categories, Unlock Animation & Grid View
+# Progress Tracking & 90-Day Skin Transformation Challenge
 
+## Features
 
-## What's Changing
+### 4. Progress Tracking (Achievement Auto-Check)
+- **After every dose completion**, achievements are automatically re-evaluated (scan milestones, streaks, ritual adherence, etc.)
+- **After HealthKit data refreshes**, sleep tracking days and HRV tracking days are counted and stored, then achievements are re-checked
+- **Popup queue system** ensures only one achievement unlock overlay shows at a time — additional unlocks wait in line and appear sequentially with a short delay between each
+- Achievement checks also trigger after mood check-ins and protocol toggles
 
-Expanding the existing 11-achievement system into a full gamification layer with new categories, a beautiful unlock animation overlay, and a dedicated achievements grid view.
-
----
-
-### **1. New Achievement Categories**
-
-Expanding from 11 to ~30 achievements across 6 categories:
-
-- **Scan Milestones**: 1, 10, 50, 100, 365 scans — rewarding long-term scanning dedication
-- **Streak**: 3, 7, 14, 30, 60, 90 day streaks — building on existing streak tracking
-- **Score**: Personal best, score 80+, score 90+, all metrics 80+ — rewarding skin improvement
-- **Health**: Connected HealthKit, 7 days sleep tracking, 30 days HRV data — health integration milestones
-- **Ritual**: 100% adherence for a day, a week, a month — protocol consistency rewards
-- **Social**: First share, 10 shares — encouraging sharing results
-
-Each achievement has a point value, icon, description, and category label.
+### 5. 90-Day Skin Transformation Challenge
+- **Start the challenge** from a card on the Home tab or a dedicated section in the Profile tab
+- **Daily check-in** counts as either completing a skin scan OR a protocol dose that day
+- **Progress ring** shows days completed out of 90, with percentage and days remaining
+- **Milestone markers** at days 7, 14, 30, 60, and 90 — each milestone shows a special badge and celebratory message when reached
+- **Before/after comparison** at completion: starting score vs. ending score, a trend chart of the full 90-day journey, and individual metric changes (texture, hydration, radiance, etc.)
+- **Restart anytime** — users can abandon and restart, or start a new challenge after completing one
 
 ---
 
-### **2. Achievement Unlock Animation**
+## Design
 
-When a new achievement is unlocked:
+### Progress Tracking
+- No new UI needed — works silently in the background
+- The existing gold achievement unlock overlay and queue system handles the display
 
-- Full-screen overlay appears with a blurred background
-- Large gold medal icon with a bouncing animation effect
-- Achievement name displayed in the app's elegant title style
-- Description shown below in body text
-- Gold particle burst celebration effect surrounds the medal
-- A subtle success haptic plays
-- Auto-dismisses after 3 seconds, or the user can tap to dismiss
-- Multiple unlocks are queued — shown one at a time, not stacked
+### 90-Day Challenge — Home Card
+- A compact gold-accented card on the Home tab (below the streak/achievement section)
+- Shows a circular progress ring (gold gradient) with "Day X / 90" in the center
+- Below the ring: current streak within the challenge + next milestone label
+- If not started: a "Begin Your Transformation" call-to-action card with a subtle shimmer
 
----
-
-### **3. Achievements View (New Screen)**
-
-A new dedicated achievements screen accessible from the Profile tab:
-
-- **Header**: Total points earned displayed prominently with a gold accent
-- **Grid layout**: 2-column grid of achievement cards
-- **Unlocked cards**: Gold accent border, filled icon, date unlocked shown
-- **Locked cards**: Silver/gray styling, progress bar showing percentage toward unlock
-- **Category sections**: "Scan Milestones", "Streaks", "Score", "Health", "Ritual", "Social" as section headers
-- **Glass card aesthetic** matching the rest of the app's premium design
+### 90-Day Challenge — Full View (from Profile)
+- Large hero progress ring at the top with day count and percentage
+- **Milestone timeline** — a vertical line with 5 milestone dots (7, 14, 30, 60, 90), filled gold when reached, silver when locked
+- Each reached milestone shows the date it was achieved
+- **Daily check-in calendar** — a grid of the last 30 days showing green dots for checked-in days, gray for missed
+- **Before/After section** (visible after day 7+): side-by-side score comparison with animated number transitions
+- **Metric breakdown**: each metric (texture, hydration, radiance, tone, under-eye, elasticity) with start → current values and delta arrows
+- **90-day trend chart** showing overall score progression
+- "Restart Challenge" button at the bottom (with confirmation)
 
 ---
 
-### **Files Created/Modified**
+## Pages / Screens
 
-- **New**: `AchievementEngine.swift` — centralized achievement checking logic, unlock queue, condition evaluation
-- **New**: `AchievementsView.swift` — the full grid achievements screen
-- **New**: `AchievementUnlockOverlay.swift` — the full-screen unlock celebration animation
-- **Modified**: `AchievementRecord.swift` — expanded enum with all new achievement types, categories, and points
-- **Modified**: `HomeViewModel.swift` — updated to use new achievement engine, removed inline achievement logic
-- **Modified**: `SkinScanViewModel.swift` — calls achievement engine after scans
-- **Modified**: `HomeView.swift` — shows achievement unlock overlay when triggered
-- **Modified**: `ProfileView.swift` — adds navigation link to the new achievements screen
-- **Modified**: `ContentView.swift` — achievement overlay at the root level so it works from any tab
+- **Home Tab** — new compact challenge card added to the existing scroll content
+- **Profile Tab** — new "90-Day Challenge" navigation link opening the full challenge detail view
+- **ChallengeDetailView** — full-screen view with progress ring, milestone timeline, calendar, before/after comparison, and trend chart
+
+---
+
+## New Data
+
+- A new data model to store: challenge start date, baseline score, baseline metrics, milestone dates, whether it's active/completed, and daily check-in records
+- Registered in the app's data container alongside existing models

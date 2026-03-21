@@ -522,9 +522,35 @@ final class HomeViewModel {
         isRefreshing = true
         refreshTrigger.toggle()
         await healthService.fetchAllData()
+        updateHealthTrackingDays()
         loadData(modelContext: modelContext)
+        AchievementEngine.shared.checkAll(modelContext: modelContext)
         try? await Task.sleep(for: .milliseconds(600))
         isRefreshing = false
+    }
+
+    private func updateHealthTrackingDays() {
+        if healthService.sleepData.totalHours != nil && healthService.sleepData.totalHours! > 0 {
+            let current = UserDefaults.standard.integer(forKey: "sleepTrackingDays")
+            let lastDate = UserDefaults.standard.object(forKey: "sleepTrackingLastDate") as? Date
+            let today = Calendar.current.startOfDay(for: Date())
+            if lastDate == nil || !Calendar.current.isDate(lastDate!, inSameDayAs: today) {
+                UserDefaults.standard.set(current + 1, forKey: "sleepTrackingDays")
+                UserDefaults.standard.set(today, forKey: "sleepTrackingLastDate")
+            }
+        }
+        if healthService.latestHRV != nil {
+            let current = UserDefaults.standard.integer(forKey: "hrvTrackingDays")
+            let lastDate = UserDefaults.standard.object(forKey: "hrvTrackingLastDate") as? Date
+            let today = Calendar.current.startOfDay(for: Date())
+            if lastDate == nil || !Calendar.current.isDate(lastDate!, inSameDayAs: today) {
+                UserDefaults.standard.set(current + 1, forKey: "hrvTrackingDays")
+                UserDefaults.standard.set(today, forKey: "hrvTrackingLastDate")
+            }
+        }
+        if healthService.isAuthorized {
+            UserDefaults.standard.set(true, forKey: "healthKitConnected")
+        }
     }
 
     func toggleProtocolItem(_ item: ProtocolItem, modelContext: ModelContext) {
@@ -556,6 +582,9 @@ final class HomeViewModel {
 
         updateStreak(modelContext: modelContext)
         try? modelContext.save()
+
+        AchievementEngine.shared.checkAll(modelContext: modelContext)
+        AchievementEngine.shared.recordChallengeCheckIn(modelContext: modelContext)
     }
 
     private func updateStreak(modelContext: ModelContext) {

@@ -35,6 +35,7 @@ struct CelleuxApp: App {
             AchievementRecord.self,
             CalibrationBaseline.self,
             DoseCompletionPattern.self,
+            SkinTransformationChallenge.self,
         ])
     }
 }
