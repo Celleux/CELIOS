@@ -5,11 +5,14 @@ struct ScanHistoryView: View {
     let history: [SkinScanResult]
     let onSelectScan: (SkinScanResult) -> Void
     let onBack: () -> Void
+    var onCompare: ((SkinScanResult, SkinScanResult) -> Void)? = nil
 
     @State private var appeared: Bool = false
     @State private var chartAnimated: Bool = false
     @State private var selectedTimeRange: HistoryTimeRange = .all
     @State private var selectedDataPoint: SkinScanResult? = nil
+    @State private var compareMode: Bool = false
+    @State private var firstCompareScan: SkinScanResult? = nil
 
     private var filteredHistory: [SkinScanResult] {
         let now = Date()
@@ -262,10 +265,57 @@ struct ScanHistoryView: View {
 
     private var scanTimeline: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("SCAN HISTORY")
-                .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(CelleuxColors.textLabel)
-                .tracking(1.8)
+            HStack {
+                Text(compareMode ? "SELECT SECOND SCAN" : "SCAN HISTORY")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(compareMode ? CelleuxColors.warmGold : CelleuxColors.textLabel)
+                    .tracking(1.8)
+                    .contentTransition(.numericText())
+
+                Spacer()
+
+                if compareMode {
+                    Button {
+                        withAnimation(CelleuxSpring.snappy) {
+                            compareMode = false
+                            firstCompareScan = nil
+                        }
+                    } label: {
+                        Text("Cancel")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(CelleuxColors.textLabel)
+                    }
+                } else if onCompare != nil && filteredHistory.count >= 2 {
+                    Button {
+                        withAnimation(CelleuxSpring.snappy) {
+                            compareMode = true
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.left.arrow.right")
+                                .font(.system(size: 10, weight: .medium))
+                            Text("Compare")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                        .foregroundStyle(CelleuxColors.warmGold)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(
+                            Capsule()
+                                .fill(CelleuxColors.warmGold.opacity(0.1))
+                        )
+                        .overlay(
+                            Capsule()
+                                .stroke(CelleuxColors.warmGold.opacity(0.3), lineWidth: 0.5)
+                        )
+                    }
+                }
+            }
+
+            if compareMode, let first = firstCompareScan {
+                compareSelectionBanner(first: first)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
 
             if filteredHistory.isEmpty {
                 emptyState
@@ -273,14 +323,78 @@ struct ScanHistoryView: View {
                 let sortedDesc = filteredHistory.sorted { $0.date > $1.date }
                 ForEach(Array(sortedDesc.enumerated()), id: \.element.id) { index, scan in
                     Button {
-                        onSelectScan(scan)
+                        handleScanTap(scan)
                     } label: {
                         scanTimelineRow(scan: scan, isLast: index == sortedDesc.count - 1)
+                            .overlay {
+                                if compareMode {
+                                    if firstCompareScan?.id == scan.id {
+                                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                            .stroke(CelleuxColors.warmGold, lineWidth: 2)
+                                            .padding(.leading, 58)
+                                    } else if firstCompareScan != nil {
+                                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                            .stroke(CelleuxColors.warmGold.opacity(0.3), lineWidth: 1)
+                                            .padding(.leading, 58)
+                                    }
+                                }
+                            }
                     }
                     .buttonStyle(PressableButtonStyle())
                     .sensoryFeedback(.selection, trigger: false)
                     .staggeredAppear(appeared: appeared, delay: 0.12 + Double(index) * 0.06)
                 }
+            }
+        }
+    }
+
+    private func handleScanTap(_ scan: SkinScanResult) {
+        if compareMode {
+            if firstCompareScan == nil {
+                withAnimation(CelleuxSpring.snappy) {
+                    firstCompareScan = scan
+                }
+            } else if firstCompareScan?.id != scan.id {
+                let first = firstCompareScan!
+                let sorted = [first, scan].sorted { $0.date < $1.date }
+                withAnimation(CelleuxSpring.snappy) {
+                    compareMode = false
+                    firstCompareScan = nil
+                }
+                onCompare?(sorted[0], sorted[1])
+            }
+        } else {
+            onSelectScan(scan)
+        }
+    }
+
+    private func compareSelectionBanner(first: SkinScanResult) -> some View {
+        CompactGlassCard {
+            HStack(spacing: 10) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(CelleuxColors.warmGold)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("First scan selected")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(CelleuxColors.textPrimary)
+                    Text("\(first.shortDateString) \u{2022} Score: \(first.overallScore)")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(CelleuxColors.textLabel)
+                }
+
+                Spacer()
+
+                Text("Tap another")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(CelleuxColors.warmGold)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(CelleuxColors.warmGold.opacity(0.1))
+                    )
             }
         }
     }

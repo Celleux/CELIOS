@@ -1,56 +1,52 @@
-# Progress Tracking & 90-Day Skin Transformation Challenge
+# AR Before/After Comparison — Slider, Time-lapse & Branded Export
 
 ## Features
 
-### 4. Progress Tracking (Achievement Auto-Check)
-- **After every dose completion**, achievements are automatically re-evaluated (scan milestones, streaks, ritual adherence, etc.)
-- **After HealthKit data refreshes**, sleep tracking days and HRV tracking days are counted and stored, then achievements are re-checked
-- **Popup queue system** ensures only one achievement unlock overlay shows at a time — additional unlocks wait in line and appear sequentially with a short delay between each
-- Achievement checks also trigger after mood check-ins and protocol toggles
-
-### 5. 90-Day Skin Transformation Challenge
-- **Start the challenge** from a card on the Home tab or a dedicated section in the Profile tab
-- **Daily check-in** counts as either completing a skin scan OR a protocol dose that day
-- **Progress ring** shows days completed out of 90, with percentage and days remaining
-- **Milestone markers** at days 7, 14, 30, 60, and 90 — each milestone shows a special badge and celebratory message when reached
-- **Before/after comparison** at completion: starting score vs. ending score, a trend chart of the full 90-day journey, and individual metric changes (texture, hydration, radiance, etc.)
-- **Restart anytime** — users can abandon and restart, or start a new challenge after completing one
+- **Slider Comparison** — Drag a gold-accented slider left and right over two scan photos to reveal "before" vs "after" in real time
+- **Metric Badges Overlay** — Small floating badges appear over face regions (forehead, cheeks, chin, etc.) showing score changes with green ↑ or amber ↓ arrows
+- **Time-lapse Mode** — Auto-play button crossfades through all historical scans, plus a manual scrubber timeline slider to drag through scan history
+- **Compare from History** — Select any two scans from Scan History to open the comparison view
+- **Branded Export** — Generate a shareable image card with the CELLEUX logo, dates, overall scores, side-by-side photos, and gold/chrome accents
+- **Share Sheet** — Export the branded comparison card via the standard iOS share sheet
 
 ---
 
 ## Design
 
-### Progress Tracking
-- No new UI needed — works silently in the background
-- The existing gold achievement unlock overlay and queue system handles the display
-
-### 90-Day Challenge — Home Card
-- A compact gold-accented card on the Home tab (below the streak/achievement section)
-- Shows a circular progress ring (gold gradient) with "Day X / 90" in the center
-- Below the ring: current streak within the challenge + next milestone label
-- If not started: a "Begin Your Transformation" call-to-action card with a subtle shimmer
-
-### 90-Day Challenge — Full View (from Profile)
-- Large hero progress ring at the top with day count and percentage
-- **Milestone timeline** — a vertical line with 5 milestone dots (7, 14, 30, 60, 90), filled gold when reached, silver when locked
-- Each reached milestone shows the date it was achieved
-- **Daily check-in calendar** — a grid of the last 30 days showing green dots for checked-in days, gray for missed
-- **Before/After section** (visible after day 7+): side-by-side score comparison with animated number transitions
-- **Metric breakdown**: each metric (texture, hydration, radiance, tone, under-eye, elasticity) with start → current values and delta arrows
-- **90-day trend chart** showing overall score progression
-- "Restart Challenge" button at the bottom (with confirmation)
+- **Dark, cinematic background** — Deep near-black background matching the existing scan aesthetic, with subtle gold radial glows
+- **Slider handle** — A vertical gold line with a circular chrome drag handle in the center; the "BEFORE" and "AFTER" labels float at the top corners
+- **Metric badges** — Small glass-pill badges (translucent white with gold border) positioned near each face region, showing the score delta (e.g. "+5 ↑" in green or "−3 ↓" in amber)
+- **Time-lapse scrubber** — A horizontal timeline bar at the bottom with gold dots for each scan date; a play/pause button centered below the photo area
+- **Branded export card** — White card with chrome border, CELLEUX wordmark top-center, side-by-side scan photos with dates underneath, overall scores in large typography with a delta badge between them, and gold gradient accent line at the bottom
+- **Transitions** — Spring animations for slider, crossfade for time-lapse, staggered appear for badges
 
 ---
 
-## Pages / Screens
+## Screens
 
-- **Home Tab** — new compact challenge card added to the existing scroll content
-- **Profile Tab** — new "90-Day Challenge" navigation link opening the full challenge detail view
-- **ChallengeDetailView** — full-screen view with progress ring, milestone timeline, calendar, before/after comparison, and trend chart
+### Before/After Comparison (Full-screen sheet)
+- **Entry**: "Compare" button added to each scan row in Scan History — tap one scan, then pick a second scan to compare
+- **Top bar**: "BEFORE / AFTER" label centered, close button top-right, date labels for each scan
+- **Photo area**: Full-width photo with the drag slider overlaying "before" (left) and "after" (right)
+- **Toggle bar**: Switch between "Slider", "Side by Side", and "Time-lapse" modes
+- **Metric badges**: Toggle button to show/hide floating score-change badges on the photo
+- **Bottom actions**: "Share Comparison" button to generate and share the branded export card
 
----
+### Time-lapse Sub-mode
+- Replaces the slider with a single photo view that crossfades between scans
+- Horizontal scrubber with dots for each scan, draggable
+- Play/pause button for auto-cycling (2-second intervals)
+- Date and score update as the active scan changes
 
-## New Data
+### Scan History (Updated)
+- Each scan row gets a small "Compare" button (or long-press context menu)
+- After tapping Compare on one scan, a selection mode highlights the second scan to compare against
+- Selecting the second scan opens the Before/After Comparison sheet
 
-- A new data model to store: challenge start date, baseline score, baseline metrics, milestone dates, whether it's active/completed, and daily check-in records
-- Registered in the app's data container alongside existing models
+### Branded Export Card (Generated image for sharing)
+- CELLEUX wordmark at top
+- Two scan photos side by side with rounded corners
+- Dates below each photo
+- Large overall scores with a delta indicator between them
+- Gold accent line at bottom
+- Rendered as a UIImage for sharing via the existing share sheet

@@ -13,6 +13,9 @@ struct ScanView: View {
     @State private var celebrationBurst: Bool = false
     @State private var faceGuidePulse: Bool = false
     @State private var analysisMetricIndex: Int = 0
+    @State private var showBeforeAfter: Bool = false
+    @State private var compareBeforeScan: SkinScanResult?
+    @State private var compareAfterScan: SkinScanResult?
 
     private let analysisMetricNames: [String] = [
         "Texture Evenness",
@@ -84,6 +87,11 @@ struct ScanView: View {
                             withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
                                 viewModel.resetScan()
                             }
+                        },
+                        onCompare: { before, after in
+                            compareBeforeScan = before
+                            compareAfterScan = after
+                            showBeforeAfter = true
                         }
                     )
                     .transition(.asymmetric(
@@ -202,6 +210,18 @@ struct ScanView: View {
                 viewModel.loadHistory(modelContext: modelContext)
                 withAnimation(.spring(response: 0.8, dampingFraction: 0.75)) {
                     appeared = true
+                }
+            }
+            .fullScreenCover(isPresented: $showBeforeAfter) {
+                if let before = compareBeforeScan, let after = compareAfterScan {
+                    BeforeAfterComparisonView(
+                        beforeScan: before,
+                        afterScan: after,
+                        allScans: viewModel.scanHistory,
+                        onDismiss: {
+                            showBeforeAfter = false
+                        }
+                    )
                 }
             }
         }
