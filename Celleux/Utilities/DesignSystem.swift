@@ -455,29 +455,35 @@ struct GlassCard<Content: View>: View {
         self.content = content()
     }
 
-    private static let chromeBorder = AngularGradient(
-        colors: [
-            CelleuxColors.silverLight.opacity(0.6),
-            CelleuxColors.warmGold.opacity(0.4),
-            Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.8),
-            CelleuxColors.silverBorder.opacity(0.5),
-            CelleuxColors.champagneGold.opacity(0.35),
-            Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.7),
-            CelleuxColors.silverLight.opacity(0.6)
-        ],
-        center: .center
-    )
+    private var chromeBorder: AngularGradient {
+        AngularGradient(
+            colors: [
+                CelleuxColors.silverLight.opacity(0.6),
+                CelleuxColors.warmGold.opacity(0.4),
+                Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.8),
+                CelleuxColors.silverBorder.opacity(0.5),
+                CelleuxColors.champagneGold.opacity(0.35),
+                Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.7),
+                CelleuxColors.silverLight.opacity(0.6)
+            ],
+            center: .center
+        )
+    }
 
-    private static let innerHighlight = LinearGradient(
-        colors: [
-            Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.15),
-            Color.clear
-        ],
-        startPoint: .top,
-        endPoint: .center
-    )
+    private var innerHighlight: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.15),
+                Color.clear
+            ],
+            startPoint: .top,
+            endPoint: .center
+        )
+    }
 
-    private static let cardFill = Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.92)
+    private var cardFill: Color {
+        Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.92)
+    }
 
     var body: some View {
         content
@@ -485,14 +491,14 @@ struct GlassCard<Content: View>: View {
             .background(
                 ZStack {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(Self.cardFill)
+                        .fill(cardFill)
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(Self.innerHighlight)
+                        .fill(innerHighlight)
                 }
             )
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(Self.chromeBorder, lineWidth: 1)
+                    .stroke(chromeBorder, lineWidth: 1)
             )
             .overlay {
                 if showShimmer {
@@ -550,27 +556,33 @@ struct CompactGlassCard<Content: View>: View {
         self.content = content()
     }
 
-    private static let chromeBorder = AngularGradient(
-        colors: [
-            CelleuxColors.silverLight.opacity(0.5),
-            CelleuxColors.warmGold.opacity(0.3),
-            Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.7),
-            CelleuxColors.silverBorder.opacity(0.4),
-            CelleuxColors.silverLight.opacity(0.5)
-        ],
-        center: .center
-    )
+    private var chromeBorder: AngularGradient {
+        AngularGradient(
+            colors: [
+                CelleuxColors.silverLight.opacity(0.5),
+                CelleuxColors.warmGold.opacity(0.3),
+                Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.7),
+                CelleuxColors.silverBorder.opacity(0.4),
+                CelleuxColors.silverLight.opacity(0.5)
+            ],
+            center: .center
+        )
+    }
 
-    private static let cardFill = Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.92)
+    private var cardFill: Color {
+        Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.92)
+    }
 
-    private static let cardHighlight = LinearGradient(
-        colors: [
-            Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.12),
-            Color.clear
-        ],
-        startPoint: .top,
-        endPoint: .center
-    )
+    private var cardHighlight: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.12),
+                Color.clear
+            ],
+            startPoint: .top,
+            endPoint: .center
+        )
+    }
 
     var body: some View {
         content
@@ -578,14 +590,14 @@ struct CompactGlassCard<Content: View>: View {
             .background(
                 ZStack {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(Self.cardFill)
+                        .fill(cardFill)
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(Self.cardHighlight)
+                        .fill(cardHighlight)
                 }
             )
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(Self.chromeBorder, lineWidth: 1)
+                    .stroke(chromeBorder, lineWidth: 1)
             )
             .celleuxDepthShadow()
     }
