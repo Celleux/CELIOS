@@ -175,7 +175,7 @@ struct SkinScoreWidgetView: View {
 
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
                             Text("\(entry.score)")
-                                .font(.system(size: 26, design: .rounded, weight: .bold))
+                                .font(.system(size: 26, weight: .bold, design: .rounded))
 
                             Text(trendArrow)
                                 .font(.system(size: 14, weight: .medium))
