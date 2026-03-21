@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import Charts
 
 struct HomeView: View {
     var switchTab: (AppTab) -> Void
@@ -13,6 +14,8 @@ struct HomeView: View {
     @State private var showLongevityScore: Bool = false
     @State private var showMoodCheckIn: Bool = false
     @State private var breathingShadow: Bool = false
+    @State private var overdueGlow: Bool = false
+    @State private var selectedFactor: LongevityFactor? = nil
     @Namespace private var heroAnimation
 
     var body: some View {
@@ -31,6 +34,7 @@ struct HomeView: View {
                         } else {
                             emptyScoreCard
                         }
+                        longevityCompositeCard
                         todaysProtocolCard
                         quickActionsRow
                         if !viewModel.weeklyScores.isEmpty {
@@ -82,6 +86,27 @@ struct HomeView: View {
                     .presentationCornerRadius(32)
                     .presentationContentInteraction(.scrolls)
             }
+            .sheet(item: $selectedFactor) { factor in
+                FactorDetailSheet(
+                    factor: factor,
+                    score: viewModel.scoreForFactor(factor),
+                    detail: viewModel.detailForFactor(factor),
+                    hasData: viewModel.factorHasData(factor),
+                    history: viewModel.historicalScoresForFactor(factor)
+                )
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground {
+                    ZStack {
+                        Color.white.opacity(0.82)
+                        Color(red: 0.97, green: 0.96, blue: 0.94).opacity(0.5)
+                    }
+                    .background(.ultraThinMaterial)
+                    .ignoresSafeArea()
+                }
+                .presentationCornerRadius(32)
+                .presentationContentInteraction(.scrolls)
+            }
             .onAppear {
                 viewModel.loadData(modelContext: modelContext)
                 withAnimation(.spring(duration: 0.8, bounce: 0.15)) {
@@ -95,56 +120,95 @@ struct HomeView: View {
                     ringGlow = true
                     breathingShadow = true
                 }
+                if viewModel.isScanOverdue || viewModel.lastScanDate == nil {
+                    withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true).delay(0.5)) {
+                        overdueGlow = true
+                    }
+                }
             }
         }
     }
 
+    // MARK: - 1. Hero Section with Narrative Insight Pill
+
     private var greetingSection: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 5) {
-                Text("\(viewModel.greeting), \(viewModel.userName)")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundStyle(CelleuxColors.textPrimary)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("\(viewModel.greeting), \(viewModel.userName)")
+                        .font(CelleuxType.title1)
+                        .tracking(CelleuxType.title1Tracking)
+                        .foregroundStyle(CelleuxColors.textPrimary)
 
-                Text(viewModel.dateString)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color(red: 0.15, green: 0.15, blue: 0.20).opacity(0.55))
-                    .tracking(1.5)
-                    .textCase(.uppercase)
-            }
+                    Text(viewModel.dateString)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(CelleuxColors.textLabel)
+                        .tracking(1.5)
+                        .textCase(.uppercase)
+                }
 
-            Spacer()
+                Spacer()
 
-            HStack(spacing: 6) {
-                Image(systemName: "sun.max.fill")
-                    .font(.system(size: 11))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [Color(hex: "E8A838"), Color(hex: "D4903C")],
-                            startPoint: .top,
-                            endPoint: .bottom
+                HStack(spacing: 6) {
+                    Image(systemName: "sun.max.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color(hex: "E8A838"), Color(hex: "D4903C")],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
                         )
-                    )
 
-                Text("UV \(viewModel.uvIndex) · \(viewModel.uvLabel)")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(CelleuxColors.textSecondary)
+                    Text("UV \(viewModel.uvIndex) · \(viewModel.uvLabel)")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(CelleuxColors.textSecondary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(
+                    Capsule()
+                        .fill(Color.white.opacity(0.95))
+                )
+                .overlay(
+                    Capsule()
+                        .stroke(Color.white.opacity(0.6), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.06), radius: 6, x: 0, y: 2)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(
-                Capsule()
-                    .fill(Color.white.opacity(0.95))
-            )
-            .overlay(
-                Capsule()
-                    .stroke(Color.white.opacity(0.6), lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(0.06), radius: 6, x: 0, y: 2)
+
+            narrativeInsightPill
         }
         .padding(.top, 4)
         .staggeredAppear(appeared: appeared, delay: 0)
     }
+
+    private var narrativeInsightPill: some View {
+        HStack(spacing: 10) {
+            Image(systemName: viewModel.narrativeInsight.icon)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(CelleuxColors.warmGold)
+
+            Text(viewModel.narrativeInsight.text)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(CelleuxColors.textSecondary)
+                .lineLimit(2)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.white.opacity(0.92))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(CelleuxColors.glassEdgeHighlight, lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 3)
+    }
+
+    // MARK: - 2. Skin Score Card
 
     private var emptyScoreCard: some View {
         GlassCard(depth: .elevated) {
@@ -165,7 +229,7 @@ struct HomeView: View {
                 Button {
                     switchTab(.scan)
                 } label: {
-                    Text("Start First Scan")
+                    Text("Take Your First Scan")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(CelleuxColors.warmGold)
                         .padding(.horizontal, 24)
@@ -190,7 +254,7 @@ struct HomeView: View {
                                 .foregroundStyle(CelleuxColors.warmGold)
                             Text("SKIN LONGEVITY SCORE")
                                 .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                .foregroundStyle(Color(red: 0.15, green: 0.15, blue: 0.20).opacity(0.55))
+                                .foregroundStyle(CelleuxColors.textLabel)
                                 .tracking(1.5)
                         }
                         Spacer()
@@ -211,46 +275,72 @@ struct HomeView: View {
                             HStack(alignment: .firstTextBaseline, spacing: 2) {
                                 Text("\(Int(viewModel.skinScore))")
                                     .font(.system(size: 52, weight: .ultraLight, design: .rounded))
-                                    .foregroundStyle(Color(red: 0.15, green: 0.15, blue: 0.20))
+                                    .foregroundStyle(CelleuxColors.textPrimary)
                                     .contentTransition(.numericText())
 
                                 Text("/100")
                                     .font(.system(size: 16, weight: .light))
-                                    .foregroundStyle(Color(red: 0.15, green: 0.15, blue: 0.20).opacity(0.4))
+                                    .foregroundStyle(CelleuxColors.textLabel)
                             }
 
                             Text("Skin Longevity")
                                 .font(.system(size: 11, weight: .medium, design: .rounded))
-                                .foregroundStyle(Color(red: 0.15, green: 0.15, blue: 0.20).opacity(0.45))
+                                .foregroundStyle(CelleuxColors.textLabel)
                                 .tracking(0.8)
                                 .textCase(.uppercase)
                         }
                     }
                     .frame(maxWidth: .infinity)
 
-                    if viewModel.scoreTrend != 0 {
-                        HStack(spacing: 10) {
-                            PulsingDot(color: CelleuxColors.warmGold)
-
-                            HStack(spacing: 4) {
-                                Image(systemName: viewModel.scoreTrend > 0 ? "arrow.up.right" : "arrow.down.right")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundStyle(CelleuxColors.warmGold)
-                                    .symbolEffect(.wiggle.up, value: scoreAnimated)
-                                Text(String(format: "%+.0f%% this week", viewModel.scoreTrend))
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(CelleuxColors.warmGold)
-                                    .contentTransition(.numericText())
-                            }
-
-                            Spacer()
-
-                            Text(viewModel.scoreTrend > 0 ? "Improving" : "Needs attention")
-                                .font(.system(size: 12, weight: .medium))
+                    VStack(spacing: 8) {
+                        if !viewModel.lastScanRelativeString.isEmpty {
+                            Text(viewModel.lastScanRelativeString)
+                                .font(CelleuxType.caption)
                                 .foregroundStyle(CelleuxColors.textLabel)
                         }
-                        .padding(.top, 4)
+
+                        if viewModel.scoreTrend != 0 && viewModel.scanCount >= 3 {
+                            HStack(spacing: 10) {
+                                PulsingDot(color: CelleuxColors.warmGold)
+
+                                HStack(spacing: 4) {
+                                    Image(systemName: viewModel.scoreTrend > 0 ? "arrow.up.right" : "arrow.down.right")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundStyle(viewModel.scoreTrend > 0 ? CelleuxColors.warmGold : Color(hex: "E53935"))
+                                        .symbolEffect(.wiggle.up, value: scoreAnimated)
+                                    Text(String(format: "%+.0f from last scan", viewModel.scoreTrend))
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundStyle(viewModel.scoreTrend > 0 ? CelleuxColors.warmGold : Color(hex: "E53935"))
+                                        .contentTransition(.numericText())
+                                }
+
+                                Spacer()
+
+                                Text(viewModel.scoreTrend > 0 ? "Improving" : "Needs attention")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(CelleuxColors.textLabel)
+                            }
+                        }
+
+                        if viewModel.isScanOverdue {
+                            Button {
+                                switchTab(.scan)
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "viewfinder")
+                                        .font(.system(size: 12, weight: .medium))
+                                    Text("Scan Now")
+                                        .font(.system(size: 13, weight: .semibold))
+                                }
+                                .foregroundStyle(CelleuxColors.warmGold)
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 10)
+                            }
+                            .buttonStyle(GlassButtonStyle(style: .primary))
+                            .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.6), trigger: overdueGlow)
+                        }
                     }
+                    .padding(.top, 4)
                 }
                 .padding(24)
                 .background(heroCardBackground)
@@ -259,7 +349,15 @@ struct HomeView: View {
         }
         .matchedTransitionSource(id: "scoreHero", in: heroAnimation)
         .buttonStyle(PressableButtonStyle())
-        .breathingShadow(isActive: breathingShadow)
+        .shadow(
+            color: viewModel.isScanOverdue
+                ? CelleuxColors.warmGold.opacity(overdueGlow ? 0.25 : 0.08)
+                : CelleuxColors.goldGlow.opacity(breathingShadow ? 0.12 : 0.06),
+            radius: viewModel.isScanOverdue
+                ? (overdueGlow ? 35 : 18)
+                : (breathingShadow ? 30 : 15),
+            x: 0, y: 10
+        )
         .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.5), trigger: showLongevityScore)
         .staggeredAppear(appeared: appeared, delay: 0.06)
     }
@@ -275,6 +373,108 @@ struct HomeView: View {
         .shadow(color: .black.opacity(0.03), radius: 30, x: 0, y: 15)
     }
 
+    // MARK: - 3. Longevity Composite Card
+
+    private var longevityCompositeCard: some View {
+        GlassCard(depth: .elevated) {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack {
+                    HStack(spacing: 6) {
+                        Image(systemName: "chart.bar.fill")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(CelleuxColors.warmGold)
+                        Text("LONGEVITY FACTORS")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(CelleuxColors.textLabel)
+                            .tracking(1.5)
+                    }
+                    Spacer()
+                }
+
+                VStack(spacing: 2) {
+                    ForEach(LongevityFactor.allCases) { factor in
+                        let hasData = viewModel.factorHasData(factor)
+                        Button {
+                            selectedFactor = factor
+                        } label: {
+                            longevityFactorRow(factor: factor, hasData: hasData)
+                        }
+                        .buttonStyle(.plain)
+                        .sensoryFeedback(.selection, trigger: selectedFactor)
+                    }
+                }
+            }
+        }
+        .staggeredAppear(appeared: appeared, delay: 0.10)
+    }
+
+    private func longevityFactorRow(factor: LongevityFactor, hasData: Bool) -> some View {
+        let score = viewModel.scoreForFactor(factor)
+        let detail = viewModel.detailForFactor(factor)
+
+        return HStack(spacing: 14) {
+            ChromeIconBadge(factor.icon, size: 36, gradient: hasData ? CelleuxColors.iconGoldGradient : CelleuxColors.iconBlueGradient)
+                .opacity(hasData ? 1.0 : 0.45)
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(factor.title)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(hasData ? CelleuxColors.textPrimary : CelleuxColors.textLabel)
+
+                    Text("\(Int(factor.weight * 100))%")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(CelleuxColors.textLabel)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule().fill(Color.white.opacity(0.6))
+                        )
+                }
+
+                if hasData {
+                    Text(detail)
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundStyle(CelleuxColors.textLabel)
+                        .lineLimit(1)
+                } else if factor.requiresWatch {
+                    Text("Connect Apple Watch")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(CelleuxColors.warmGold.opacity(0.7))
+                } else {
+                    Text("No data yet")
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundStyle(CelleuxColors.textLabel)
+                }
+            }
+
+            Spacer()
+
+            if hasData {
+                MiniFactorRing(progress: score / 100, size: 34)
+
+                Text("\(Int(score))")
+                    .font(.system(size: 16, weight: .light))
+                    .foregroundStyle(CelleuxColors.textPrimary)
+                    .contentTransition(.numericText())
+                    .frame(width: 30, alignment: .trailing)
+            } else {
+                Text("\u{2014}")
+                    .font(.system(size: 18, weight: .light))
+                    .foregroundStyle(CelleuxColors.textLabel)
+                    .frame(width: 30, alignment: .trailing)
+            }
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(CelleuxColors.textLabel)
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 4)
+    }
+
+    // MARK: - Existing Sections (unchanged)
+
     private var todaysProtocolCard: some View {
         GlassCard(depth: .elevated) {
             VStack(alignment: .leading, spacing: 18) {
@@ -285,7 +485,7 @@ struct HomeView: View {
                             .foregroundStyle(CelleuxColors.warmGold)
                         Text("TODAY'S PROTOCOL")
                             .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundStyle(Color(red: 0.15, green: 0.15, blue: 0.20).opacity(0.55))
+                            .foregroundStyle(CelleuxColors.textLabel)
                             .tracking(1.5)
                     }
                     Spacer()
@@ -304,7 +504,7 @@ struct HomeView: View {
                 }
             }
         }
-        .staggeredAppear(appeared: appeared, delay: 0.12)
+        .staggeredAppear(appeared: appeared, delay: 0.14)
     }
 
     private var protocolProgressBar: some View {
@@ -372,7 +572,7 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(item.period)
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color(red: 0.15, green: 0.15, blue: 0.20).opacity(0.45))
+                    .foregroundStyle(CelleuxColors.textLabel)
                     .tracking(0.8)
                     .textCase(.uppercase)
 
@@ -397,7 +597,7 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("QUICK ACTIONS")
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color(red: 0.15, green: 0.15, blue: 0.20).opacity(0.55))
+                .foregroundStyle(CelleuxColors.textLabel)
                 .tracking(1.5)
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -418,7 +618,7 @@ struct HomeView: View {
             }
             .contentMargins(.horizontal, 0)
         }
-        .staggeredAppear(appeared: appeared, delay: 0.18)
+        .staggeredAppear(appeared: appeared, delay: 0.20)
     }
 
     @State private var chipFlashId: String? = nil
@@ -456,21 +656,12 @@ struct HomeView: View {
 
                     Image(systemName: icon)
                         .font(.system(size: 22, weight: .medium))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 0.79, green: 0.66, blue: 0.43),
-                                    Color(red: 0.65, green: 0.55, blue: 0.38)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .foregroundStyle(CelleuxColors.iconGoldGradient)
                 }
 
                 Text(title)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Color(red: 0.15, green: 0.15, blue: 0.20).opacity(0.7))
+                    .foregroundStyle(CelleuxColors.textSecondary)
             }
             .frame(width: 84)
             .padding(.vertical, 14)
@@ -499,7 +690,7 @@ struct HomeView: View {
                                 .foregroundStyle(CelleuxColors.dataGold)
                             Text("YOUR SKIN THIS WEEK")
                                 .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                .foregroundStyle(Color(red: 0.15, green: 0.15, blue: 0.20).opacity(0.55))
+                                .foregroundStyle(CelleuxColors.textLabel)
                                 .tracking(1.5)
                         }
                         Spacer()
@@ -513,7 +704,7 @@ struct HomeView: View {
         }
         .buttonStyle(PressableButtonStyle())
         .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.3), trigger: false)
-        .staggeredAppear(appeared: appeared, delay: 0.24)
+        .staggeredAppear(appeared: appeared, delay: 0.26)
     }
 
     private var weeklyChart: some View {
@@ -621,7 +812,7 @@ struct HomeView: View {
                 Spacer()
             }
         }
-        .staggeredAppear(appeared: appeared, delay: 0.30)
+        .staggeredAppear(appeared: appeared, delay: 0.32)
     }
 
     @ViewBuilder
@@ -669,10 +860,200 @@ struct HomeView: View {
             )
             .shadow(color: .black.opacity(0.06), radius: 12, x: 0, y: 6)
             .shadow(color: .black.opacity(0.03), radius: 30, x: 0, y: 15)
-            .staggeredAppear(appeared: appeared, delay: 0.36)
+            .staggeredAppear(appeared: appeared, delay: 0.38)
         }
     }
 }
+
+// MARK: - Mini Factor Ring
+
+struct MiniFactorRing: View {
+    let progress: Double
+    let size: CGFloat
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(CelleuxColors.silver.opacity(0.15), lineWidth: 3)
+                .frame(width: size, height: size)
+
+            Circle()
+                .trim(from: 0, to: progress)
+                .stroke(
+                    LinearGradient(
+                        colors: [CelleuxColors.warmGold.opacity(0.8), CelleuxColors.warmGold],
+                        startPoint: .topLeading,
+                        endPoint: .trailing
+                    ),
+                    style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                )
+                .frame(width: size, height: size)
+                .rotationEffect(.degrees(-90))
+        }
+    }
+}
+
+// MARK: - Factor Detail Sheet
+
+struct FactorDetailSheet: View {
+    let factor: LongevityFactor
+    let score: Double
+    let detail: String
+    let hasData: Bool
+    let history: [(date: Date, score: Double)]
+
+    @State private var ringGlow: Bool = false
+    @State private var appeared: Bool = false
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 24) {
+                    heroSection
+                    if !history.isEmpty {
+                        trendSection
+                    }
+                    impactSection
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 40)
+            }
+            .scrollIndicators(.hidden)
+            .navigationTitle(factor.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                withAnimation(.spring(duration: 0.6, bounce: 0.15)) {
+                    appeared = true
+                }
+                withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true)) {
+                    ringGlow = true
+                }
+            }
+        }
+    }
+
+    private var heroSection: some View {
+        VStack(spacing: 16) {
+            ZStack {
+                LuxuryBezelRing(
+                    progress: hasData ? score / 100 : 0,
+                    size: 120,
+                    lineWidth: 8,
+                    glowing: $ringGlow
+                )
+
+                if hasData {
+                    Text("\(Int(score))")
+                        .font(.system(size: 36, weight: .ultraLight, design: .rounded))
+                        .foregroundStyle(CelleuxColors.textPrimary)
+                        .contentTransition(.numericText())
+                } else {
+                    Text("\u{2014}")
+                        .font(.system(size: 28, weight: .light))
+                        .foregroundStyle(CelleuxColors.textLabel)
+                }
+            }
+
+            Text(detail)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(CelleuxColors.textSecondary)
+
+            HStack(spacing: 4) {
+                Text("Weight:")
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(CelleuxColors.textLabel)
+                Text("\(Int(factor.weight * 100))% of composite")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(CelleuxColors.warmGold)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .staggeredAppear(appeared: appeared, delay: 0)
+    }
+
+    private var trendSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("7-DAY TREND")
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(CelleuxColors.textLabel)
+                .tracking(1.5)
+
+            Chart {
+                ForEach(Array(history.enumerated()), id: \.offset) { index, entry in
+                    LineMark(
+                        x: .value("Day", entry.date),
+                        y: .value("Score", entry.score)
+                    )
+                    .interpolationMethod(.catmullRom)
+                    .foregroundStyle(CelleuxColors.warmGold)
+
+                    PointMark(
+                        x: .value("Day", entry.date),
+                        y: .value("Score", entry.score)
+                    )
+                    .foregroundStyle(CelleuxColors.warmGold)
+                    .symbolSize(24)
+                }
+            }
+            .chartYScale(domain: 0...100)
+            .chartXAxis {
+                AxisMarks(values: .stride(by: .day)) { value in
+                    AxisValueLabel(format: .dateTime.weekday(.abbreviated))
+                        .font(.system(size: 10))
+                        .foregroundStyle(CelleuxColors.textLabel)
+                }
+            }
+            .chartYAxis {
+                AxisMarks(position: .leading, values: [0, 25, 50, 75, 100]) { value in
+                    AxisValueLabel()
+                        .font(.system(size: 10))
+                        .foregroundStyle(CelleuxColors.textLabel)
+                    AxisGridLine()
+                        .foregroundStyle(CelleuxColors.silver.opacity(0.15))
+                }
+            }
+            .frame(height: 160)
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.white.opacity(0.6))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.white.opacity(0.8), lineWidth: 1)
+        )
+        .staggeredAppear(appeared: appeared, delay: 0.08)
+    }
+
+    private var impactSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("HOW IT AFFECTS YOUR SKIN")
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(CelleuxColors.textLabel)
+                .tracking(1.5)
+
+            Text(factor.skinImpact)
+                .font(.system(size: 14, weight: .regular))
+                .foregroundStyle(CelleuxColors.textSecondary)
+                .lineSpacing(6)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.white.opacity(0.6))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.white.opacity(0.8), lineWidth: 1)
+        )
+        .staggeredAppear(appeared: appeared, delay: 0.14)
+    }
+}
+
+// MARK: - Mood Check-In Sheet
 
 struct MoodCheckInSheet: View {
     @Environment(\.modelContext) private var modelContext
@@ -886,7 +1267,7 @@ struct MoodCheckInSheet: View {
         let hkAssociations = selectedAssociations.map(\.hkAssociation)
 
         Task {
-            let saved = await healthService.saveStateOfMind(
+            _ = await healthService.saveStateOfMind(
                 valence: valenceValue,
                 kind: .momentaryEmotion,
                 labels: hkLabels,

@@ -128,4 +128,15 @@ nonisolated enum LongevityFactor: String, Identifiable, CaseIterable, Sendable {
         default: 0
         }
     }
+
+    var skinImpact: String {
+        switch self {
+        case .sleep: "Deep sleep drives growth hormone release for collagen synthesis and cellular repair."
+        case .hrv: "Higher HRV indicates better stress resilience, reducing cortisol-driven skin damage."
+        case .skinAnalysis: "Direct measurement of texture, hydration, radiance, and tone from your face scan."
+        case .adherence: "Consistent supplement intake ensures steady nutrient delivery for skin renewal."
+        case .activity: "Exercise boosts circulation, delivering oxygen and nutrients to skin cells."
+        case .circadian: "Aligned circadian rhythm optimizes melatonin and cortisol cycles for skin repair."
+        }
+    }
 }

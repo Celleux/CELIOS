@@ -138,7 +138,7 @@ final class SkinLongevityViewModel {
 
     private func computeSkinAnalysisScore() -> Double {
         let stored = latestSkinScanScore
-        guard stored > 0 else { return 72 }
+        guard stored > 0 else { return 0 }
         return Double(stored)
     }
 

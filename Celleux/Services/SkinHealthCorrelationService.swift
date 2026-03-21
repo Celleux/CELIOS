@@ -148,6 +148,55 @@ final class SkinHealthCorrelationService {
         }
     }
 
+    func generateNarrativeInsight(latestSkinScore: Int, hasScanData: Bool) -> NarrativeInsight {
+        var candidates: [NarrativeInsight] = []
+
+        if !hasScanData {
+            return NarrativeInsight(text: "Complete your first scan to get insights", icon: "viewfinder", priority: 0)
+        }
+
+        if stressRiskLevel == .high {
+            candidates.append(NarrativeInsight(text: "Elevated stress may be affecting your skin", icon: "brain.head.profile", priority: 10))
+        }
+
+        if sleepScore >= 80 {
+            candidates.append(NarrativeInsight(text: "Great sleep is boosting your skin recovery", icon: "moon.fill", priority: 7))
+        } else if sleepScore > 0 && sleepScore < 50 {
+            candidates.append(NarrativeInsight(text: "Poor sleep may slow collagen repair tonight", icon: "moon.zzz.fill", priority: 8))
+        }
+
+        if hydrationScore < 50 && hydrationScore > 0 {
+            candidates.append(NarrativeInsight(text: "Hydration could use some attention today", icon: "drop.fill", priority: 7))
+        } else if hydrationScore >= 80 {
+            candidates.append(NarrativeInsight(text: "Your hydration is on point today", icon: "drop.fill", priority: 5))
+        }
+
+        if uvScore < 50 && uvScore > 0 {
+            candidates.append(NarrativeInsight(text: "High UV exposure detected — reapply SPF", icon: "sun.max.trianglebadge.exclamationmark.fill", priority: 9))
+        }
+
+        if activityScore >= 75 {
+            candidates.append(NarrativeInsight(text: "Activity is boosting circulation to your skin", icon: "figure.run", priority: 5))
+        }
+
+        if latestSkinScore >= 80 {
+            candidates.append(NarrativeInsight(text: "Your skin is glowing today", icon: "sparkles", priority: 6))
+        } else if latestSkinScore >= 60 {
+            candidates.append(NarrativeInsight(text: "Your skin is looking steady", icon: "face.smiling", priority: 4))
+        } else if latestSkinScore > 0 {
+            candidates.append(NarrativeInsight(text: "Your skin needs a little extra care today", icon: "heart.fill", priority: 6))
+        }
+
+        if overallCorrelationScore >= 80 {
+            candidates.append(NarrativeInsight(text: "Your lifestyle is strongly supporting your skin", icon: "leaf.fill", priority: 5))
+        }
+
+        guard let best = candidates.max(by: { $0.priority < $1.priority }) else {
+            return NarrativeInsight(text: "Keep tracking for personalized insights", icon: "sparkles", priority: 0)
+        }
+        return best
+    }
+
     func generateInsights() -> [SkinCorrelationInsight] {
         var insights: [SkinCorrelationInsight] = []
 
@@ -312,4 +361,10 @@ nonisolated enum InsightSeverity: String, Sendable {
     case neutral
     case warning
     case critical
+}
+
+nonisolated struct NarrativeInsight: Sendable {
+    let text: String
+    let icon: String
+    let priority: Int
 }
