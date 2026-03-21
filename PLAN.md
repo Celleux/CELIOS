@@ -1,52 +1,39 @@
-# AR Before/After Comparison — Slider, Time-lapse & Branded Export
+# Aging Simulation — Predict Your Skin's Future
+
 
 ## Features
 
-- **Slider Comparison** — Drag a gold-accented slider left and right over two scan photos to reveal "before" vs "after" in real time
-- **Metric Badges Overlay** — Small floating badges appear over face regions (forehead, cheeks, chin, etc.) showing score changes with green ↑ or amber ↓ arrows
-- **Time-lapse Mode** — Auto-play button crossfades through all historical scans, plus a manual scrubber timeline slider to drag through scan history
-- **Compare from History** — Select any two scans from Scan History to open the comparison view
-- **Branded Export** — Generate a shareable image card with the CELLEUX logo, dates, overall scores, side-by-side photos, and gold/chrome accents
-- **Share Sheet** — Export the branded comparison card via the standard iOS share sheet
-
----
+- **Aging Trajectory Projection** — Uses your current skin metrics (wrinkle depth, elasticity, hydration, texture, radiance) to simulate how your face may age over 5, 10, and 20 years
+- **Dual Scenario Comparison** — See two futures side-by-side via a drag slider: "At Current Rate" (no routine) vs. "With CELLEUX Routine" (optimistic improvement trajectory)
+- **Year Selector** — Tap between 5, 10, and 20 year projections; each applies progressively stronger aging effects
+- **Simulated Score Projections** — Below the face comparison, see projected overall score and key metric scores for each scenario at the selected year
+- **Medical Disclaimer** — Clear banner at the bottom: "Simulation only. Not a medical prediction."
+- **Share Comparison** — Export the current slider view as an image to share
 
 ## Design
 
-- **Dark, cinematic background** — Deep near-black background matching the existing scan aesthetic, with subtle gold radial glows
-- **Slider handle** — A vertical gold line with a circular chrome drag handle in the center; the "BEFORE" and "AFTER" labels float at the top corners
-- **Metric badges** — Small glass-pill badges (translucent white with gold border) positioned near each face region, showing the score delta (e.g. "+5 ↑" in green or "−3 ↓" in amber)
-- **Time-lapse scrubber** — A horizontal timeline bar at the bottom with gold dots for each scan date; a play/pause button centered below the photo area
-- **Branded export card** — White card with chrome border, CELLEUX wordmark top-center, side-by-side scan photos with dates underneath, overall scores in large typography with a delta badge between them, and gold gradient accent line at the bottom
-- **Transitions** — Spring animations for slider, crossfade for time-lapse, staggered appear for badges
-
----
+- **Dark cinematic background** matching the existing Before/After comparison screen (deep navy/black with subtle gold radial glow)
+- **Slider overlay** — Draggable vertical divider splitting the face photo; left side shows "At Current Rate", right side shows "With CELLEUX Routine"
+- **Year selector** — Three gold-accented capsule buttons (5Y / 10Y / 20Y) horizontally centered below the slider
+- **Scenario labels** — "AT CURRENT RATE" on the left in amber/warm tone, "WITH CELLEUX" on the right in green/gold tone, using the app's signature uppercase tracking style
+- **Projected scores section** — Two compact glass cards side by side showing projected overall score with a mini ring, plus 3 key metrics (Wrinkles, Elasticity, Hydration) as mini bars
+- **Disclaimer** — Subtle caption text at the very bottom in the app's tertiary text color
+- **Entry animation** — Face fades in with a subtle scale spring, year buttons stagger in, scores animate with number counting
+- **Haptic feedback** on year selection changes
 
 ## Screens
 
-### Before/After Comparison (Full-screen sheet)
-- **Entry**: "Compare" button added to each scan row in Scan History — tap one scan, then pick a second scan to compare
-- **Top bar**: "BEFORE / AFTER" label centered, close button top-right, date labels for each scan
-- **Photo area**: Full-width photo with the drag slider overlaying "before" (left) and "after" (right)
-- **Toggle bar**: Switch between "Slider", "Side by Side", and "Time-lapse" modes
-- **Metric badges**: Toggle button to show/hide floating score-change badges on the photo
-- **Bottom actions**: "Share Comparison" button to generate and share the branded export card
+- **Aging Simulation Sheet** — Full-screen sheet presented from the Scan Results screen via a new "Aging Simulation" button (placed near the existing comparison/share buttons). Contains:
+  - Top header bar with title "AGING SIMULATION" and close button
+  - Face photo with slider overlay comparing two aging scenarios
+  - Year selector (5 / 10 / 20)
+  - Projected score cards for both scenarios
+  - Disclaimer text
+  - Share button
 
-### Time-lapse Sub-mode
-- Replaces the slider with a single photo view that crossfades between scans
-- Horizontal scrubber with dots for each scan, draggable
-- Play/pause button for auto-cycling (2-second intervals)
-- Date and score update as the active scan changes
+## How It Works
 
-### Scan History (Updated)
-- Each scan row gets a small "Compare" button (or long-press context menu)
-- After tapping Compare on one scan, a selection mode highlights the second scan to compare against
-- Selecting the second scan opens the Before/After Comparison sheet
-
-### Branded Export Card (Generated image for sharing)
-- CELLEUX wordmark at top
-- Two scan photos side by side with rounded corners
-- Dates below each photo
-- Large overall scores with a delta indicator between them
-- Gold accent line at bottom
-- Rendered as a UIImage for sharing via the existing share sheet
+- The simulation uses image processing filters (blur, contrast adjustment, noise, desaturation, sharpening) applied to the user's actual scan photo, calibrated by their real skin metric scores
+- Lower current scores = more aggressive aging in the "At Current Rate" scenario
+- The "With CELLEUX Routine" scenario assumes gradual metric improvement, resulting in a gentler aging progression
+- No external AI model needed — all processing happens locally on-device using built-in image filters

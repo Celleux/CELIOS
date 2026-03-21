@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import ARKit
+import CoreImage
 
 struct ScanView: View {
     @State private var viewModel = SkinScanViewModel()
@@ -16,6 +17,7 @@ struct ScanView: View {
     @State private var showBeforeAfter: Bool = false
     @State private var compareBeforeScan: SkinScanResult?
     @State private var compareAfterScan: SkinScanResult?
+    @State private var showAgingSimulation: Bool = false
 
     private let analysisMetricNames: [String] = [
         "Texture Evenness",
@@ -60,6 +62,9 @@ struct ScanView: View {
                                     withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
                                         viewModel.showHistory()
                                     }
+                                },
+                                onShowAgingSimulation: {
+                                    showAgingSimulation = true
                                 }
                             )
 
@@ -212,6 +217,17 @@ struct ScanView: View {
                     appeared = true
                 }
             }
+            .fullScreenCover(isPresented: $showAgingSimulation) {
+                if let result = viewModel.currentResult {
+                    AgingSimulationView(
+                        result: result,
+                        capturedImage: capturedImageFromBuffer(),
+                        onDismiss: {
+                            showAgingSimulation = false
+                        }
+                    )
+                }
+            }
             .fullScreenCover(isPresented: $showBeforeAfter) {
                 if let before = compareBeforeScan, let after = compareAfterScan {
                     BeforeAfterComparisonView(
@@ -225,6 +241,14 @@ struct ScanView: View {
                 }
             }
         }
+    }
+
+    private func capturedImageFromBuffer() -> UIImage? {
+        guard let buffer = viewModel.capturedPixelBuffer else { return nil }
+        let ciImage = CIImage(cvPixelBuffer: buffer)
+        let context = CIContext()
+        guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else { return nil }
+        return UIImage(cgImage: cgImage)
     }
 
     private var isDarkPhase: Bool {

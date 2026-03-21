@@ -6,6 +6,7 @@ struct ScanResultsView: View {
     let history: [SkinScanResult]
     let onNewScan: () -> Void
     let onShowHistory: () -> Void
+    var onShowAgingSimulation: (() -> Void)? = nil
 
     @State private var appeared: Bool = false
     @State private var scoreAnimated: Bool = false
@@ -38,6 +39,7 @@ struct ScanResultsView: View {
                 regionBreakdown
                 metricDetailCarousel
                 comparisonButton
+                agingSimulationButton
                 shareButton
                 actionButtons
                 disclaimerText
@@ -515,6 +517,26 @@ struct ScanResultsView: View {
                 .staggeredAppear(appeared: appeared, delay: 0.46)
             }
         }
+    }
+
+    // MARK: - Aging Simulation Button
+
+    private var agingSimulationButton: some View {
+        Button {
+            onShowAgingSimulation?()
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "clock.arrow.2.circlepath")
+                    .font(.system(size: 14, weight: .medium))
+                Text("Aging Simulation")
+                    .font(.system(size: 14, weight: .semibold))
+            }
+            .foregroundStyle(CelleuxColors.warmGold)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+        }
+        .buttonStyle(GlassButtonStyle(style: .primary))
+        .staggeredAppear(appeared: appeared, delay: 0.47)
     }
 
     // MARK: - Share Button
