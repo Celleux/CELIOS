@@ -101,7 +101,7 @@ struct ARFaceTrackingView: UIViewRepresentable {
 
         nonisolated func renderer(_ renderer: SCNSceneRenderer, nodeFor anchor: ARAnchor) -> SCNNode? {
             guard anchor is ARFaceAnchor,
-                  let device = (renderer as? ARSCNView)?.device,
+                  let device = MTLCreateSystemDefaultDevice(),
                   let geometry = ARSCNFaceGeometry(device: device) else { return nil }
 
             geometry.firstMaterial?.fillMode = .lines

@@ -74,7 +74,7 @@ final class HealthKitService {
     func requestAuthorization() async -> Bool {
         guard isAvailable else { return false }
 
-        var readTypes: Set<HKObjectType> = [
+        let readTypes: Set<HKObjectType> = [
             HKQuantityType(.heartRateVariabilitySDNN),
             HKQuantityType(.restingHeartRate),
             HKQuantityType(.vo2Max),
