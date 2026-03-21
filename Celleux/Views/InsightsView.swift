@@ -13,14 +13,21 @@ struct InsightsView: View {
     @State private var shareHaptic: Int = 0
     @State private var selectedChartDate: Date?
     @State private var showHealthCorrelation: Bool = false
+    @State private var insightEngine: InsightEngine = InsightEngine()
+    @State private var expandedInsightID: UUID? = nil
+    @State private var cardTapTrigger: Int = 0
+    @State private var isRefreshing: Bool = false
 
     private var totalDays: Int { checkIns.count }
     private var hasEnoughData: Bool { totalDays >= 7 }
+    private var hasEnoughScans: Bool { scans.count >= 3 }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 28) {
+                    insightFeedSection
+
                     if hasEnoughData {
                         timeframePicker
                         skinScoreTrendChart
@@ -36,6 +43,17 @@ struct InsightsView: View {
                 .padding(.top, 8)
                 .padding(.bottom, 100)
             }
+            .refreshable {
+                isRefreshing = true
+                insightEngine.generateInsights(
+                    scans: scans,
+                    longevityScores: longevityScores,
+                    modelContext: modelContext
+                )
+                try? await Task.sleep(for: .milliseconds(600))
+                isRefreshing = false
+            }
+            .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.4), trigger: isRefreshing)
             .background(CelleuxMeshBackground())
             .navigationTitle("Insights")
             .navigationBarTitleDisplayMode(.large)
@@ -53,6 +71,7 @@ struct InsightsView: View {
             .navigationDestination(isPresented: $showHealthCorrelation) {
                 HealthCorrelationView()
             }
+            .sensoryFeedback(.selection, trigger: cardTapTrigger)
             .onAppear {
                 withAnimation(.spring(response: 0.8, dampingFraction: 0.75)) {
                     appeared = true
@@ -60,9 +79,281 @@ struct InsightsView: View {
                 withAnimation(.easeOut(duration: 1.2).delay(0.5)) {
                     chartAnimated = true
                 }
+                insightEngine.generateInsights(
+                    scans: scans,
+                    longevityScores: longevityScores,
+                    modelContext: modelContext
+                )
             }
         }
     }
+
+    // MARK: - Insight Feed
+
+    private var insightFeedSection: some View {
+        VStack(spacing: 16) {
+            HStack {
+                SectionHeader(title: "Your Insights")
+                Spacer()
+                if !insightEngine.insights.isEmpty {
+                    Text("\(insightEngine.insights.count)")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(
+                            Capsule()
+                                .fill(CelleuxColors.goldGradient)
+                        )
+                }
+            }
+
+            if !hasEnoughScans {
+                notEnoughScansCard
+            } else if insightEngine.insights.isEmpty {
+                noInsightsCard
+            } else {
+                VStack(spacing: 12) {
+                    ForEach(Array(insightEngine.insights.prefix(8).enumerated()), id: \.element.id) { index, insight in
+                        insightCard(insight)
+                            .staggeredAppear(appeared: appeared, delay: Double(index) * 0.05)
+                    }
+                }
+            }
+        }
+        .staggeredAppear(appeared: appeared, delay: 0)
+    }
+
+    private var notEnoughScansCard: some View {
+        GlassCard(depth: .elevated) {
+            VStack(spacing: 20) {
+                ChromeIconBadge("viewfinder", size: 56)
+                    .symbolEffect(.breathe, isActive: appeared)
+
+                VStack(spacing: 8) {
+                    Text("Scan more to unlock insights")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(CelleuxColors.textPrimary)
+
+                    Text("Complete \(max(0, 3 - scans.count)) more scans to start seeing personalized trends and recommendations.")
+                        .font(.system(size: 14, weight: .regular))
+                        .foregroundStyle(CelleuxColors.textLabel)
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(3)
+                }
+
+                ZStack {
+                    Capsule()
+                        .fill(Color(hex: "F0ECE6"))
+                        .frame(height: 6)
+                    GeometryReader { geo in
+                        Capsule()
+                            .fill(CelleuxColors.goldGradient)
+                            .frame(width: geo.size.width * min(1, Double(scans.count) / 3.0))
+                    }
+                    .frame(height: 6)
+                }
+                .frame(maxWidth: 200)
+
+                Text("\(scans.count) of 3 scans")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(CelleuxColors.textLabel)
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private var noInsightsCard: some View {
+        GlassCard {
+            VStack(spacing: 16) {
+                ChromeIconBadge("sparkles", size: 48)
+                Text("No new insights right now")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(CelleuxColors.textSecondary)
+                Text("Keep tracking — insights appear as patterns emerge in your data.")
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(CelleuxColors.textLabel)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    @ViewBuilder
+    private func insightCard(_ insight: PersonalInsight) -> some View {
+        let isExpanded = expandedInsightID == insight.id
+
+        Button {
+            cardTapTrigger += 1
+            withAnimation(CelleuxSpring.snappy) {
+                if expandedInsightID == insight.id {
+                    expandedInsightID = nil
+                } else {
+                    expandedInsightID = insight.id
+                }
+            }
+        } label: {
+            HStack(spacing: 0) {
+                accentStrip(for: insight.type)
+
+                VStack(alignment: .leading, spacing: isExpanded ? 16 : 10) {
+                    HStack(alignment: .top, spacing: 12) {
+                        ChromeIconBadge(insight.icon, size: 36, gradient: gradientForType(insight.type))
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text(insight.title)
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(CelleuxColors.textPrimary)
+                                    .lineLimit(isExpanded ? nil : 1)
+                                Spacer()
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(CelleuxColors.textLabel)
+                                    .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                            }
+
+                            Text(insight.body)
+                                .font(.system(size: 13, weight: .regular))
+                                .foregroundStyle(CelleuxColors.textSecondary)
+                                .lineLimit(isExpanded ? nil : 2)
+                                .lineSpacing(2)
+                        }
+                    }
+
+                    HStack {
+                        insightTypeBadge(insight.type)
+                        Spacer()
+                        Text(relativeDate(insight.timestamp))
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(CelleuxColors.textLabel)
+                    }
+
+                    if isExpanded {
+                        PremiumDivider()
+
+                        if let detail = insight.detail {
+                            Text(detail)
+                                .font(.system(size: 13, weight: .regular))
+                                .foregroundStyle(CelleuxColors.textSecondary)
+                                .lineSpacing(3)
+                        }
+
+                        if let actionLabel = insight.actionLabel {
+                            Button {
+                                handleInsightAction(insight)
+                            } label: {
+                                Text(actionLabel)
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(CelleuxColors.warmGold)
+                                    .padding(.vertical, 10)
+                                    .padding(.horizontal, 20)
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(GlassButtonStyle(style: .primary))
+                        }
+                    }
+                }
+                .padding(16)
+            }
+            .background(
+                ZStack {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .fill(Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.92))
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.white.opacity(0.15), Color.clear],
+                                startPoint: .top,
+                                endPoint: .center
+                            )
+                        )
+                }
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(
+                        AngularGradient(
+                            colors: [
+                                CelleuxColors.silverLight.opacity(0.5),
+                                CelleuxColors.warmGold.opacity(0.3),
+                                Color.white.opacity(0.7),
+                                CelleuxColors.silverBorder.opacity(0.4),
+                                CelleuxColors.silverLight.opacity(0.5)
+                            ],
+                            center: .center
+                        ),
+                        lineWidth: 1
+                    )
+            )
+            .celleuxDepthShadow()
+        }
+        .buttonStyle(PressableButtonStyle())
+    }
+
+    private func accentStrip(for type: PersonalInsightType) -> some View {
+        RoundedRectangle(cornerRadius: 2)
+            .fill(colorForType(type))
+            .frame(width: 3)
+            .padding(.vertical, 12)
+            .padding(.leading, 2)
+    }
+
+    private func colorForType(_ type: PersonalInsightType) -> Color {
+        switch type {
+        case .celebration: return CelleuxColors.warmGold
+        case .trendAlert: return CelleuxColors.silver
+        case .actionItem: return Color(hex: "D4A054")
+        case .correlationDiscovery: return CelleuxP3.champagne
+        case .weeklySummary: return CelleuxColors.silverLight
+        }
+    }
+
+    private func gradientForType(_ type: PersonalInsightType) -> LinearGradient {
+        switch type {
+        case .celebration: return CelleuxColors.iconGoldGradient
+        case .trendAlert: return CelleuxColors.silverGradient
+        case .actionItem: return CelleuxColors.iconAmberGradient
+        case .correlationDiscovery: return CelleuxColors.iconGoldGradient
+        case .weeklySummary: return CelleuxColors.iconBlueGradient
+        }
+    }
+
+    private func insightTypeBadge(_ type: PersonalInsightType) -> some View {
+        let label: String
+        switch type {
+        case .celebration: label = "Celebration"
+        case .trendAlert: label = "Trend"
+        case .actionItem: label = "Action"
+        case .correlationDiscovery: label = "Discovery"
+        case .weeklySummary: label = "Weekly"
+        }
+
+        return Text(label.uppercased())
+            .font(.system(size: 9, weight: .bold))
+            .foregroundStyle(colorForType(type))
+            .tracking(0.8)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(
+                Capsule()
+                    .fill(colorForType(type).opacity(0.1))
+            )
+    }
+
+    private func handleInsightAction(_ insight: PersonalInsight) {
+        guard let destination = insight.actionDestination else { return }
+        switch destination {
+        case .openHealth:
+            showHealthCorrelation = true
+        case .openScan, .openProtocol:
+            break
+        case .tip:
+            break
+        }
+    }
+
+    // MARK: - Early Days Card
 
     private var earlyDaysCard: some View {
         GlassCard(depth: .elevated) {
@@ -103,6 +394,8 @@ struct InsightsView: View {
         .staggeredAppear(appeared: appeared, delay: 0)
     }
 
+    // MARK: - Timeframe Picker
+
     private var timeframePicker: some View {
         HStack(spacing: 0) {
             ForEach(Timeframe.allCases, id: \.self) { frame in
@@ -141,6 +434,8 @@ struct InsightsView: View {
         )
         .staggeredAppear(appeared: appeared, delay: 0)
     }
+
+    // MARK: - Skin Score Trend Chart
 
     private var skinScoreTrendChart: some View {
         GlassCard(depth: .elevated) {
@@ -250,6 +545,8 @@ struct InsightsView: View {
         .staggeredAppear(appeared: appeared, delay: 0.06)
     }
 
+    // MARK: - Health Correlation Card
+
     private var healthCorrelationCard: some View {
         Button { showHealthCorrelation = true } label: {
             GlassCard(depth: .elevated) {
@@ -310,6 +607,8 @@ struct InsightsView: View {
         .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.3), trigger: showHealthCorrelation)
         .staggeredAppear(appeared: appeared, delay: 0.12)
     }
+
+    // MARK: - Mood Correlation
 
     private var moodCorrelationSection: some View {
         VStack(spacing: 12) {
@@ -373,6 +672,8 @@ struct InsightsView: View {
         .staggeredAppear(appeared: appeared, delay: 0.18)
     }
 
+    // MARK: - Factor Breakdown
+
     private var factorDonutChart: some View {
         VStack(spacing: 12) {
             SectionHeader(title: "Score Breakdown")
@@ -394,6 +695,8 @@ struct InsightsView: View {
         }
         .staggeredAppear(appeared: appeared, delay: 0.24)
     }
+
+    // MARK: - Filtered Data
 
     private var filteredScans: [SkinScanRecord] {
         let days: Int
@@ -463,6 +766,8 @@ struct InsightsView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
+
+    // MARK: - Achievement Section
 
     private var achievementSection: some View {
         VStack(spacing: 12) {
