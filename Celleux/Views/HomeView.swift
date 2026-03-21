@@ -10,7 +10,7 @@ struct HomeView: View {
     @State private var scoreAnimated: Bool = false
     @State private var ringGlow: Bool = false
     @State private var protocolToggleTrigger: Bool = false
-    @State private var selectedDay: Int? = nil
+    @State private var countdownText: String? = nil
     @State private var showLongevityScore: Bool = false
     @State private var showMoodCheckIn: Bool = false
     @State private var breathingShadow: Bool = false
@@ -36,10 +36,9 @@ struct HomeView: View {
                         }
                         longevityCompositeCard
                         todaysProtocolCard
+                        healthSnapshotSection
                         quickActionsRow
-                        if !viewModel.weeklyScores.isEmpty {
-                            weeklySnapshotCard
-                        }
+                        weeklyTrendCard
                         if viewModel.streakDays > 0 {
                             streakCard
                         }
@@ -109,6 +108,7 @@ struct HomeView: View {
             }
             .onAppear {
                 viewModel.loadData(modelContext: modelContext)
+                startCountdownTimer()
                 withAnimation(.spring(duration: 0.8, bounce: 0.15)) {
                     appeared = true
                 }
@@ -473,7 +473,7 @@ struct HomeView: View {
         .padding(.horizontal, 4)
     }
 
-    // MARK: - Existing Sections (unchanged)
+    // MARK: - 4. Today's Protocol
 
     private var todaysProtocolCard: some View {
         GlassCard(depth: .elevated) {
@@ -497,6 +497,10 @@ struct HomeView: View {
 
                 protocolProgressBar
 
+                if let countdown = countdownText {
+                    protocolCountdownPill(countdown)
+                }
+
                 VStack(spacing: 0) {
                     ForEach(Array(viewModel.protocolItems.enumerated()), id: \.element.id) { index, item in
                         protocolRow(item: item, isLast: index == viewModel.protocolItems.count - 1)
@@ -504,7 +508,29 @@ struct HomeView: View {
                 }
             }
         }
+        .sensoryFeedback(.success, trigger: viewModel.protocolCompletionTrigger)
         .staggeredAppear(appeared: appeared, delay: 0.14)
+    }
+
+    private func protocolCountdownPill(_ text: String) -> some View {
+        HStack(spacing: 8) {
+            PulsingDot(color: CelleuxColors.warmGold)
+
+            Text(text)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(CelleuxColors.warmGold)
+                .contentTransition(.numericText())
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(
+            Capsule()
+                .fill(CelleuxColors.warmGold.opacity(0.08))
+        )
+        .overlay(
+            Capsule()
+                .stroke(CelleuxColors.warmGold.opacity(0.15), lineWidth: 1)
+        )
     }
 
     private var protocolProgressBar: some View {
@@ -518,17 +544,26 @@ struct HomeView: View {
                     .fill(CelleuxColors.goldGradient)
                     .frame(width: geo.size.width * CGFloat(viewModel.completedCount) / CGFloat(max(viewModel.totalCount, 1)), height: 5)
                     .shadow(color: CelleuxColors.warmGold.opacity(0.5), radius: 6, x: 0, y: 0)
+                    .animation(CelleuxSpring.luxury, value: viewModel.completedCount)
             }
         }
         .frame(height: 5)
     }
 
     private func protocolRow(item: ProtocolItem, isLast: Bool) -> some View {
-        HStack(spacing: 14) {
+        let isNextDose = viewModel.nextDoseItem?.id == item.id
+
+        return HStack(spacing: 14) {
             VStack(spacing: 0) {
                 Button {
-                    viewModel.toggleProtocolItem(item, modelContext: modelContext)
-                    protocolToggleTrigger.toggle()
+                    withAnimation(CelleuxSpring.snappy) {
+                        viewModel.toggleProtocolItem(item, modelContext: modelContext)
+                        protocolToggleTrigger.toggle()
+                        if item.isCompleted == false {
+                            viewModel.protocolCompletionTrigger.toggle()
+                        }
+                    }
+                    updateCountdown()
                 } label: {
                     ZStack {
                         Circle()
@@ -542,6 +577,8 @@ struct HomeView: View {
                             .stroke(
                                 item.isCompleted ?
                                 AngularGradient(colors: [CelleuxColors.warmGold.opacity(0.7), CelleuxColors.warmGold.opacity(0.25), CelleuxColors.warmGold.opacity(0.6)], center: .center) :
+                                isNextDose ?
+                                AngularGradient(colors: [CelleuxColors.warmGold.opacity(0.5), CelleuxColors.warmGold.opacity(0.15), CelleuxColors.warmGold.opacity(0.4)], center: .center) :
                                 AngularGradient(colors: [Color.white.opacity(0.8), CelleuxColors.silverBorder.opacity(0.25), Color.white.opacity(0.6)], center: .center),
                                 lineWidth: item.isCompleted ? 1.5 : 1
                             )
@@ -570,11 +607,24 @@ struct HomeView: View {
             }
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(item.period)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(CelleuxColors.textLabel)
-                    .tracking(0.8)
-                    .textCase(.uppercase)
+                HStack(spacing: 6) {
+                    Text(item.period)
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(CelleuxColors.textLabel)
+                        .tracking(0.8)
+                        .textCase(.uppercase)
+
+                    if isNextDose && !item.isCompleted {
+                        Text("NEXT")
+                            .font(.system(size: 9, weight: .bold, design: .rounded))
+                            .foregroundStyle(CelleuxColors.warmGold)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(
+                                Capsule().fill(CelleuxColors.warmGold.opacity(0.12))
+                            )
+                    }
+                }
 
                 Text(item.title)
                     .font(.system(size: 15, weight: .medium))
@@ -590,6 +640,22 @@ struct HomeView: View {
             .padding(.bottom, isLast ? 0 : 12)
 
             Spacer()
+        }
+    }
+
+    private func startCountdownTimer() {
+        updateCountdown()
+        Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                updateCountdown()
+            }
+        }
+    }
+
+    private func updateCountdown() {
+        withAnimation(.easeInOut(duration: 0.3)) {
+            countdownText = viewModel.nextDoseCountdownString
         }
     }
 
@@ -679,102 +745,308 @@ struct HomeView: View {
         .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.5), trigger: chipFlashId)
     }
 
-    private var weeklySnapshotCard: some View {
-        Button { switchTab(.insights) } label: {
-            GlassCard(depth: .elevated) {
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack {
-                        HStack(spacing: 6) {
-                            Image(systemName: "chart.xyaxis.line")
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(CelleuxColors.dataGold)
-                            Text("YOUR SKIN THIS WEEK")
-                                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                .foregroundStyle(CelleuxColors.textLabel)
-                                .tracking(1.5)
+    // MARK: - 5. Health Snapshot
+
+    private var healthSnapshotSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("HEALTH SNAPSHOT")
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(CelleuxColors.textLabel)
+                .tracking(1.5)
+
+            if viewModel.hasHealthSnapshotData {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        if let sleep = viewModel.sleepValueString {
+                            healthSnapshotCard(
+                                icon: "moon.fill",
+                                title: "Sleep",
+                                value: sleep,
+                                detail: viewModel.sleepDetailString,
+                                sparkline: viewModel.sleepSparkline
+                            )
                         }
-                        Spacer()
+                        if let hrv = viewModel.hrvValueString {
+                            healthSnapshotCard(
+                                icon: "heart.text.square",
+                                title: "HRV",
+                                value: hrv,
+                                detail: viewModel.hrvDetailString,
+                                sparkline: viewModel.hrvSparkline
+                            )
+                        }
+                        if let hydration = viewModel.hydrationValueString {
+                            healthSnapshotCard(
+                                icon: "drop.fill",
+                                title: "Hydration",
+                                value: hydration,
+                                detail: viewModel.hydrationDetailString,
+                                sparkline: viewModel.hydrationSparkline
+                            )
+                        }
+                    }
+                }
+                .contentMargins(.horizontal, 0)
+            } else {
+                healthSnapshotEmptyState
+            }
+        }
+        .staggeredAppear(appeared: appeared, delay: 0.18)
+    }
+
+    private func healthSnapshotCard(icon: String, title: String, value: String, detail: String?, sparkline: [Double]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(CelleuxColors.warmGold)
+                Text(title.uppercased())
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(CelleuxColors.textLabel)
+                    .tracking(1.0)
+            }
+
+            Text(value)
+                .font(.system(size: 28, weight: .light))
+                .foregroundStyle(CelleuxColors.textPrimary)
+                .contentTransition(.numericText())
+
+            if let detail {
+                Text(detail)
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundStyle(CelleuxColors.textLabel)
+                    .lineLimit(1)
+            }
+
+            if sparkline.count >= 2 {
+                miniSparkline(data: sparkline)
+                    .frame(height: 28)
+            }
+        }
+        .frame(width: 150)
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color.white.opacity(0.92))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(CelleuxColors.glassEdgeHighlight, lineWidth: 1)
+        )
+        .celleuxDepthShadow()
+    }
+
+    private func miniSparkline(data: [Double]) -> some View {
+        Chart {
+            ForEach(Array(data.enumerated()), id: \.offset) { index, value in
+                LineMark(
+                    x: .value("Day", index),
+                    y: .value("Score", value)
+                )
+                .interpolationMethod(.catmullRom)
+                .foregroundStyle(CelleuxColors.warmGold.opacity(0.8))
+            }
+        }
+        .chartXAxis(.hidden)
+        .chartYAxis(.hidden)
+        .chartYScale(domain: 0...100)
+    }
+
+    private var healthSnapshotEmptyState: some View {
+        HStack(spacing: 14) {
+            Image(systemName: "applewatch")
+                .font(.system(size: 24, weight: .light))
+                .foregroundStyle(CelleuxColors.silver)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Connect Apple Watch")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(CelleuxColors.textPrimary)
+                Text("For deeper sleep, HRV & hydration insights")
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(CelleuxColors.textLabel)
+            }
+
+            Spacer()
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color.white.opacity(0.92))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(CelleuxColors.glassEdgeHighlight, lineWidth: 1)
+        )
+        .celleuxDepthShadow()
+    }
+
+    // MARK: - 6. Weekly Trend (Swift Charts)
+
+    private var weeklyTrendCard: some View {
+        GlassCard(depth: .elevated) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    HStack(spacing: 6) {
+                        Image(systemName: "chart.xyaxis.line")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(CelleuxColors.dataGold)
+                        Text("YOUR SKIN THIS WEEK")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(CelleuxColors.textLabel)
+                            .tracking(1.5)
+                    }
+                    Spacer()
+                    Button {
+                        switchTab(.insights)
+                    } label: {
                         Image(systemName: "chevron.right")
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(CelleuxColors.textLabel)
                     }
-                    weeklyChart
                 }
+
+                weeklySwiftChart
             }
         }
-        .buttonStyle(PressableButtonStyle())
-        .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.3), trigger: false)
+        .sensoryFeedback(.selection, trigger: viewModel.selectedWeeklyScore?.id)
         .staggeredAppear(appeared: appeared, delay: 0.26)
     }
 
-    private var weeklyChart: some View {
+    @ViewBuilder
+    private var weeklySwiftChart: some View {
         let scores = viewModel.weeklyScores
-        guard scores.count >= 2 else {
-            return AnyView(
-                Text("Complete more scans to see trends")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(CelleuxColors.textLabel)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 24)
-            )
-        }
-        let minScore = (scores.map(\.score).min() ?? 70) - 5
-        let maxScore = (scores.map(\.score).max() ?? 80) + 5
-        let range = maxScore - minScore
+        if scores.count >= 2 {
+            let minY = max(0, (scores.map(\.score).min() ?? 50) - 10)
+            let maxY = min(100, (scores.map(\.score).max() ?? 80) + 10)
 
-        return AnyView(
-            GeometryReader { geo in
-                let width = geo.size.width
-                let height: CGFloat = 120
-                let stepX = width / CGFloat(scores.count - 1)
-
-                ZStack(alignment: .bottomLeading) {
-                    Path { path in
-                        for (index, score) in scores.enumerated() {
-                            let x = stepX * CGFloat(index)
-                            let y = height - ((score.score - minScore) / range * height)
-                            if index == 0 {
-                                path.move(to: CGPoint(x: x, y: y))
-                            } else {
-                                let prev = scores[index - 1]
-                                let prevX = stepX * CGFloat(index - 1)
-                                let prevY = height - ((prev.score - minScore) / range * height)
-                                path.addCurve(
-                                    to: CGPoint(x: x, y: y),
-                                    control1: CGPoint(x: prevX + stepX * 0.4, y: prevY),
-                                    control2: CGPoint(x: x - stepX * 0.4, y: y)
-                                )
-                            }
-                        }
-                    }
-                    .trim(from: 0, to: scoreAnimated ? 1 : 0)
-                    .stroke(
-                        LinearGradient(colors: [CelleuxP3.coolSilver, CelleuxColors.warmGold], startPoint: .leading, endPoint: .trailing),
-                        style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round)
+            Chart {
+                ForEach(scores) { score in
+                    AreaMark(
+                        x: .value("Day", score.date),
+                        y: .value("Score", score.score)
+                    )
+                    .interpolationMethod(.catmullRom)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [
+                                CelleuxColors.warmGold.opacity(0.3),
+                                CelleuxColors.warmGold.opacity(0.05)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
                     )
 
-                    ForEach(Array(scores.enumerated()), id: \.element.id) { index, score in
-                        let x = stepX * CGFloat(index)
-                        let y = height - ((score.score - minScore) / range * height)
-                        ZStack {
-                            Circle().fill(Color.white).frame(width: 10, height: 10)
-                            Circle().fill(CelleuxColors.warmGold.opacity(0.7)).frame(width: 5, height: 5)
-                        }
-                        .position(x: x, y: y)
-                        .opacity(scoreAnimated ? 1 : 0)
-                    }
+                    LineMark(
+                        x: .value("Day", score.date),
+                        y: .value("Score", score.score)
+                    )
+                    .interpolationMethod(.catmullRom)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [CelleuxP3.coolSilver, CelleuxColors.warmGold],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
 
-                    ForEach(Array(scores.enumerated()), id: \.element.id) { index, score in
-                        let x = stepX * CGFloat(index)
-                        Text(score.day)
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(CelleuxColors.textLabel)
-                            .position(x: x, y: height + 16)
+                    PointMark(
+                        x: .value("Day", score.date),
+                        y: .value("Score", score.score)
+                    )
+                    .foregroundStyle(viewModel.selectedWeeklyScore?.id == score.id ? CelleuxColors.warmGold : CelleuxColors.warmGold.opacity(0.6))
+                    .symbolSize(viewModel.selectedWeeklyScore?.id == score.id ? 60 : 20)
+                    .annotation(position: .top, spacing: 6) {
+                        if viewModel.selectedWeeklyScore?.id == score.id {
+                            VStack(spacing: 2) {
+                                Text("\(Int(score.score))")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(CelleuxColors.textPrimary)
+                                Text(score.day)
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(CelleuxColors.textLabel)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(Color.white.opacity(0.95))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .stroke(CelleuxColors.warmGold.opacity(0.3), lineWidth: 1)
+                            )
+                            .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
+                            .transition(.scale.combined(with: .opacity))
+                        }
                     }
                 }
             }
-            .frame(height: 145)
-        )
+            .chartYScale(domain: minY...maxY)
+            .chartXAxis {
+                AxisMarks(values: .stride(by: .day)) { _ in
+                    AxisValueLabel(format: .dateTime.weekday(.abbreviated))
+                        .font(.system(size: 10))
+                        .foregroundStyle(CelleuxColors.textLabel)
+                }
+            }
+            .chartYAxis {
+                AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { _ in
+                    AxisValueLabel()
+                        .font(.system(size: 10))
+                        .foregroundStyle(CelleuxColors.textLabel)
+                    AxisGridLine()
+                        .foregroundStyle(CelleuxColors.silver.opacity(0.1))
+                }
+            }
+            .chartOverlay { proxy in
+                GeometryReader { _ in
+                    Rectangle()
+                        .fill(Color.clear)
+                        .contentShape(Rectangle())
+                        .onTapGesture { location in
+                            guard let date: Date = proxy.value(atX: location.x) else { return }
+                            let closest = scores.min(by: {
+                                abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date))
+                            })
+                            withAnimation(CelleuxSpring.snappy) {
+                                if viewModel.selectedWeeklyScore?.id == closest?.id {
+                                    viewModel.selectedWeeklyScore = nil
+                                } else {
+                                    viewModel.selectedWeeklyScore = closest
+                                }
+                            }
+                        }
+                }
+            }
+            .frame(height: 160)
+
+            if scores.count < 7 {
+                Text("\(scores.count) of 7 days tracked")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(CelleuxColors.textLabel)
+                    .frame(maxWidth: .infinity)
+            }
+        } else if scores.count == 1 {
+            VStack(spacing: 8) {
+                Text("\(Int(scores[0].score))")
+                    .font(.system(size: 32, weight: .light))
+                    .foregroundStyle(CelleuxColors.textPrimary)
+                Text("Complete more scans to see trends")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(CelleuxColors.textLabel)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 24)
+        } else {
+            Text("Complete more scans to see trends")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(CelleuxColors.textLabel)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 24)
+        }
     }
 
     private var streakCard: some View {

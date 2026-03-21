@@ -28,6 +28,9 @@ final class HomeViewModel {
 
     var longevityHistoryScores: [DailyLongevityScore] = []
 
+    var selectedWeeklyScore: DailyScore? = nil
+    var protocolCompletionTrigger: Bool = false
+
     private let healthService = HealthKitService.shared
     private let correlationService = SkinHealthCorrelationService.shared
 
@@ -73,6 +76,78 @@ final class HomeViewModel {
 
     var hasWatchData: Bool {
         healthService.hasWatchData
+    }
+
+    var nextDoseItem: ProtocolItem? {
+        let now = Date()
+        return protocolItems.first { !$0.isCompleted && ($0.scheduledDate ?? now) >= now }
+    }
+
+    var nextDoseCountdownString: String? {
+        guard let next = nextDoseItem, let scheduled = next.scheduledDate else { return nil }
+        let interval = scheduled.timeIntervalSince(Date())
+        guard interval > 0 else { return nil }
+        let hours = Int(interval) / 3600
+        let minutes = (Int(interval) % 3600) / 60
+        if hours > 0 {
+            return "Next in \(hours)h \(minutes)m"
+        }
+        return "Next in \(minutes)m"
+    }
+
+    var hasHealthSnapshotData: Bool {
+        healthService.sleepData.totalHours != nil ||
+        healthService.latestHRV != nil ||
+        healthService.todayWaterIntake != nil
+    }
+
+    var sleepValueString: String? {
+        guard let hours = healthService.sleepData.totalHours, hours > 0 else { return nil }
+        return String(format: "%.1fh", hours)
+    }
+
+    var sleepDetailString: String? {
+        guard let total = healthService.sleepData.totalMinutes, total > 0 else { return nil }
+        let deep = healthService.sleepData.deepMinutes ?? 0
+        let pct = Int((deep / total) * 100)
+        return "\(pct)% deep sleep"
+    }
+
+    var hrvValueString: String? {
+        guard let hrv = healthService.latestHRV else { return nil }
+        return String(format: "%.0f ms", hrv)
+    }
+
+    var hrvDetailString: String? {
+        guard let rhr = healthService.latestRestingHR else { return nil }
+        return String(format: "%.0f BPM resting", rhr)
+    }
+
+    var hydrationValueString: String? {
+        guard let water = healthService.todayWaterIntake, water > 0 else { return nil }
+        if water >= 1000 {
+            return String(format: "%.1fL", water / 1000)
+        }
+        return String(format: "%.0f mL", water)
+    }
+
+    var hydrationDetailString: String? {
+        guard let water = healthService.todayWaterIntake, water > 0 else { return nil }
+        let goal: Double = 2500
+        let pct = Int((water / goal) * 100)
+        return "\(min(pct, 100))% of daily goal"
+    }
+
+    var sleepSparkline: [Double] {
+        longevityHistoryScores.suffix(7).map { $0.sleepScore }
+    }
+
+    var hrvSparkline: [Double] {
+        longevityHistoryScores.suffix(7).map { $0.hrvScore }
+    }
+
+    var hydrationSparkline: [Double] {
+        longevityHistoryScores.suffix(7).map { $0.hydrationScore }
     }
 
     func scoreForFactor(_ factor: LongevityFactor) -> Double {
@@ -300,6 +375,11 @@ final class HomeViewModel {
         let morningM = wakeM + 30
         let eveningMinutes = max(0, sleepH * 60 - 90)
 
+        let today = calendar.startOfDay(for: Date())
+        let morningDate = calendar.date(byAdding: DateComponents(hour: morningH, minute: morningM % 60), to: today)
+        let middayDate = calendar.date(byAdding: DateComponents(hour: 12, minute: 30), to: today)
+        let eveningDate = calendar.date(byAdding: DateComponents(hour: eveningMinutes / 60, minute: eveningMinutes % 60), to: today)
+
         protocolItems = [
             ProtocolItem(
                 time: String(format: "%d:%02d AM", morningH > 12 ? morningH - 12 : (morningH == 0 ? 12 : morningH), morningM % 60),
@@ -307,7 +387,8 @@ final class HomeViewModel {
                 icon: "sunrise.fill",
                 period: "Morning",
                 isCompleted: completedCategories.contains("morning"),
-                category: "morning"
+                category: "morning",
+                scheduledDate: morningDate
             ),
             ProtocolItem(
                 time: "12:30 PM",
@@ -315,7 +396,8 @@ final class HomeViewModel {
                 icon: "drop.fill",
                 period: "Afternoon",
                 isCompleted: completedCategories.contains("midday"),
-                category: "midday"
+                category: "midday",
+                scheduledDate: middayDate
             ),
             ProtocolItem(
                 time: String(format: "%d:%02d PM", eveningMinutes / 60 > 12 ? eveningMinutes / 60 - 12 : eveningMinutes / 60, eveningMinutes % 60),
@@ -323,7 +405,8 @@ final class HomeViewModel {
                 icon: "moon.stars.fill",
                 period: "Evening",
                 isCompleted: completedCategories.contains("evening"),
-                category: "evening"
+                category: "evening",
+                scheduledDate: eveningDate
             )
         ]
     }
@@ -347,7 +430,7 @@ final class HomeViewModel {
         formatter.dateFormat = "EEE"
 
         weeklyScores = scans.map { scan in
-            DailyScore(day: formatter.string(from: scan.date), score: Double(scan.overallScore))
+            DailyScore(day: formatter.string(from: scan.date), score: Double(scan.overallScore), date: scan.date)
         }
     }
 
@@ -434,12 +517,14 @@ struct ProtocolItem: Identifiable {
     let period: String
     var isCompleted: Bool
     var category: String = ""
+    var scheduledDate: Date? = nil
 }
 
 struct DailyScore: Identifiable {
     let id = UUID()
     let day: String
     let score: Double
+    var date: Date = Date()
 }
 
 struct Achievement: Identifiable {
