@@ -448,6 +448,139 @@ final class SkinHealthCorrelationService {
 
         return stats
     }
+
+    func computeSleepSkinScatterData(from scores: [DailyLongevityScore]) -> [SleepSkinDataPoint] {
+        scores.compactMap { score in
+            let sleepHours = score.sleepScore > 0 ? sleepHoursFromScore(score.sleepScore) : nil
+            let skinVal = score.skinScore > 0 ? score.skinScore : nil
+            guard let hours = sleepHours, let skin = skinVal else { return nil }
+            return SleepSkinDataPoint(date: score.date, sleepHours: hours, skinScore: skin)
+        }
+    }
+
+    private func sleepHoursFromScore(_ score: Double) -> Double {
+        if score >= 90 { return 7.0 + (score - 90) / 5.0 }
+        if score >= 60 { return 6.0 + (score - 60) / 30.0 }
+        if score >= 40 { return 5.0 + (score - 40) / 20.0 }
+        return max(3.0, score / 8.0)
+    }
+
+    func computeLinearRegression(from points: [SleepSkinDataPoint]) -> (slope: Double, intercept: Double, r2: Double)? {
+        guard points.count >= 3 else { return nil }
+        let n = Double(points.count)
+        let xs = points.map(\.sleepHours)
+        let ys = points.map(\.skinScore)
+        let sumX = xs.reduce(0, +)
+        let sumY = ys.reduce(0, +)
+        let sumXY = zip(xs, ys).map(*).reduce(0, +)
+        let sumX2 = xs.map { $0 * $0 }.reduce(0, +)
+        let denom = n * sumX2 - sumX * sumX
+        guard abs(denom) > 0.0001 else { return nil }
+        let slope = (n * sumXY - sumX * sumY) / denom
+        let intercept = (sumY - slope * sumX) / n
+        let meanY = sumY / n
+        let ssTot = ys.map { ($0 - meanY) * ($0 - meanY) }.reduce(0, +)
+        let ssRes = zip(xs, ys).map { x, y in
+            let predicted = slope * x + intercept
+            return (y - predicted) * (y - predicted)
+        }.reduce(0, +)
+        let r2 = ssTot > 0 ? 1 - ssRes / ssTot : 0
+        return (slope, intercept, r2)
+    }
+
+    func computeSleepSkinInsight(from points: [SleepSkinDataPoint]) -> String? {
+        guard points.count >= 5 else { return nil }
+        let goodSleep = points.filter { $0.sleepHours >= 7.5 }
+        let poorSleep = points.filter { $0.sleepHours < 6.5 }
+        guard goodSleep.count >= 2, poorSleep.count >= 2 else { return nil }
+        let goodAvg = goodSleep.map(\.skinScore).reduce(0, +) / Double(goodSleep.count)
+        let poorAvg = poorSleep.map(\.skinScore).reduce(0, +) / Double(poorSleep.count)
+        let delta = goodAvg - poorAvg
+        guard abs(delta) > 2 else { return nil }
+        return String(format: "Nights with 7.5+ hours → %.0f%% better skin scores", delta)
+    }
+
+    func computeConfidenceBand(regression: (slope: Double, intercept: Double, r2: Double), points: [SleepSkinDataPoint], at x: Double) -> (lower: Double, upper: Double) {
+        let predicted = regression.slope * x + regression.intercept
+        let residuals = points.map { p in
+            let pred = regression.slope * p.sleepHours + regression.intercept
+            return (p.skinScore - pred) * (p.skinScore - pred)
+        }
+        let stdErr = sqrt(residuals.reduce(0, +) / max(1, Double(points.count - 2)))
+        let band = stdErr * 1.5
+        return (max(0, predicted - band), min(100, predicted + band))
+    }
+
+    func impactLevel(for score: Double) -> ImpactLevel {
+        if score >= 75 { return .strongPositive }
+        if score >= 55 { return .moderatePositive }
+        if score >= 40 { return .neutral }
+        return .negative
+    }
+
+    func currentValueString(for factor: SkinHealthFactor) -> String {
+        switch factor {
+        case .sleep:
+            guard let hours = healthService.sleepData.totalHours else { return "—" }
+            return String(format: "%.1fh", hours)
+        case .stress:
+            guard let hrv = healthService.latestHRV else { return "—" }
+            return String(format: "%.0f ms", hrv)
+        case .hydration:
+            guard let water = healthService.todayWaterIntake else { return "—" }
+            return String(format: "%.0f mL", water)
+        case .uvExposure:
+            guard let uv = healthService.todayUVExposure else { return "—" }
+            return String(format: "%.1f", uv)
+        case .activity:
+            guard let cal = healthService.todayActiveCalories else { return "—" }
+            return String(format: "%.0f kcal", cal)
+        }
+    }
+
+    func factorHasData(_ factor: SkinHealthFactor) -> Bool {
+        switch factor {
+        case .sleep: healthService.sleepData.totalHours != nil
+        case .stress: healthService.latestHRV != nil
+        case .hydration: healthService.todayWaterIntake != nil
+        case .uvExposure: healthService.todayUVExposure != nil
+        case .activity: healthService.todayActiveCalories != nil
+        }
+    }
+
+    func stressInsight() -> String {
+        if stressRiskLevel == .high {
+            return "Low HRV + negative mood increases cortisol-driven skin damage."
+        } else if stressRiskLevel == .moderate {
+            return "Moderate stress detected. Cortisol may affect skin barrier function."
+        } else if stressRiskLevel == .low {
+            return "Low stress load supports collagen integrity and skin recovery."
+        }
+        return "Connect Apple Watch for stress insights."
+    }
+}
+
+nonisolated struct SleepSkinDataPoint: Identifiable, Sendable {
+    let id = UUID()
+    let date: Date
+    let sleepHours: Double
+    let skinScore: Double
+}
+
+nonisolated enum ImpactLevel: String, Sendable {
+    case strongPositive
+    case moderatePositive
+    case neutral
+    case negative
+
+    var label: String {
+        switch self {
+        case .strongPositive: "Strong positive"
+        case .moderatePositive: "Moderate positive"
+        case .neutral: "Neutral"
+        case .negative: "Negative impact"
+        }
+    }
 }
 
 nonisolated enum SkinHealthFactor: String, Identifiable, CaseIterable, Sendable {
