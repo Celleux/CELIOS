@@ -202,7 +202,7 @@ struct HealthCorrelationView: View {
 
     private var sleepSkinCorrelationSection: some View {
         VStack(spacing: 14) {
-            SectionHeader(title: "Sleep \u2194 Skin Correlation")
+            SectionHeader(title: "Sleep \u{2194} Skin Correlation")
 
             GlassCard(depth: .elevated) {
                 VStack(alignment: .leading, spacing: 16) {
@@ -347,7 +347,7 @@ struct HealthCorrelationView: View {
                 label: "Deep",
                 value: {
                     guard let total = healthService.sleepData.totalMinutes, total > 0,
-                          let deep = healthService.sleepData.deepMinutes else { return "\u2014" }
+                          let deep = healthService.sleepData.deepMinutes else { return "\u{2014}" }
                     return String(format: "%.0f%%", (deep / total) * 100)
                 }()
             )
@@ -356,7 +356,7 @@ struct HealthCorrelationView: View {
                 label: "REM",
                 value: {
                     guard let total = healthService.sleepData.totalMinutes, total > 0,
-                          let rem = healthService.sleepData.remMinutes else { return "\u2014" }
+                          let rem = healthService.sleepData.remMinutes else { return "\u{2014}" }
                     return String(format: "%.0f%%", (rem / total) * 100)
                 }()
             )
@@ -841,7 +841,7 @@ struct HealthCorrelationView: View {
                             .foregroundStyle(CelleuxColors.textPrimary)
                             .contentTransition(.numericText())
                     } else {
-                        Text("\u2014")
+                        Text("\u{2014}")
                             .font(.system(size: 24, weight: .light))
                             .foregroundStyle(CelleuxColors.textLabel)
                     }
@@ -922,7 +922,7 @@ struct HealthCorrelationView: View {
                     .font(.system(size: 9, weight: .bold))
                     .foregroundStyle(CelleuxColors.textPrimary)
             } else {
-                Text("\u2014")
+                Text("\u{2014}")
                     .font(.system(size: 11, weight: .light))
                     .foregroundStyle(CelleuxColors.textLabel)
             }
@@ -962,7 +962,7 @@ struct HealthCorrelationView: View {
                                 .foregroundStyle(CelleuxColors.textLabel)
                         }
                     } else {
-                        Text("\u2014")
+                        Text("\u{2014}")
                             .font(.system(size: 24, weight: .light))
                             .foregroundStyle(CelleuxColors.textLabel)
                     }
@@ -1453,7 +1453,7 @@ struct CorrelationFactorCard: View {
                                     .font(.system(size: 12, weight: .medium))
                                     .foregroundStyle(CelleuxColors.textSecondary)
 
-                                Text("\u00B7")
+                                Text("\u{00B7}")
                                     .foregroundStyle(CelleuxColors.textLabel)
 
                                 Text(impactLevel.label)
@@ -1527,7 +1527,7 @@ struct CorrelationFactorCard: View {
                     .foregroundStyle(CelleuxColors.textPrimary)
                     .contentTransition(.numericText())
             } else {
-                Text("\u2014")
+                Text("\u{2014}")
                     .font(.system(size: 18, weight: .light))
                     .foregroundStyle(CelleuxColors.textLabel)
             }
@@ -1611,7 +1611,7 @@ struct FactorDetailSheet: View {
                         .foregroundStyle(CelleuxColors.textPrimary)
                         .contentTransition(.numericText())
                 } else {
-                    Text("\u2014")
+                    Text("\u{2014}")
                         .font(.system(size: 24, weight: .light))
                         .foregroundStyle(CelleuxColors.textLabel)
                 }
