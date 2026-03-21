@@ -491,6 +491,7 @@
 				INFOPLIST_KEY_NSCameraUsageDescription = "Celleux uses the camera for skin analysis scans and QR code scanning.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Celleux reads your health data to calculate your Skin Longevity Score and personalize supplement timing.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Celleux saves your mood check-ins as State of Mind entries in Apple Health.";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -528,6 +529,7 @@
 				INFOPLIST_KEY_NSCameraUsageDescription = "Celleux uses the camera for skin analysis scans and QR code scanning.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Celleux reads your health data to calculate your Skin Longevity Score and personalize supplement timing.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Celleux saves your mood check-ins as State of Mind entries in Apple Health.";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

@@ -230,10 +230,10 @@ final class HomeViewModel {
         loadLongevityFactors(modelContext: modelContext)
         loadLongevityHistory(modelContext: modelContext)
         loadNarrativeInsight(modelContext: modelContext)
-        updateWidgetData()
+        updateWidgetData(modelContext: modelContext)
     }
 
-    private func updateWidgetData() {
+    private func updateWidgetData(modelContext: ModelContext) {
         let shared = UserDefaults(suiteName: "group.app.rork.celleux-new-ui")
         shared?.set(Int(targetScore), forKey: "widgetSkinScore")
 
@@ -249,6 +249,13 @@ final class HomeViewModel {
 
         if let lastScan = lastScanDate {
             shared?.set(lastScan.timeIntervalSince1970, forKey: "widgetLastScanDate")
+        }
+
+        let scanDesc = FetchDescriptor<SkinScanRecord>(sortBy: [SortDescriptor(\SkinScanRecord.date, order: .reverse)])
+        if let latest = try? modelContext.fetch(scanDesc).first {
+            shared?.set(Int(latest.textureEvennessScore.rounded()), forKey: "widgetTextureScore")
+            shared?.set(Int(latest.apparentHydrationScore.rounded()), forKey: "widgetHydrationScore")
+            shared?.set(Int(latest.brightnessRadianceScore.rounded()), forKey: "widgetRadianceScore")
         }
 
         WidgetCenter.shared.reloadTimelines(ofKind: "SkinScoreWidget")

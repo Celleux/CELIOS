@@ -1,6 +1,8 @@
 import SwiftUI
 import SwiftData
 import ARKit
+import ActivityKit
+import WidgetKit
 
 @Observable
 final class SkinScanViewModel {
@@ -223,6 +225,8 @@ final class SkinScanViewModel {
         }
     }
 
+    private var currentActivity: Activity<ScanActivityAttributes>?
+
     func beginScan(modelContext: ModelContext) {
         guard !isScanning else { return }
         isScanning = true
@@ -237,12 +241,15 @@ final class SkinScanViewModel {
         analysisStatusText = "Initializing scan..."
         analysisDetailText = "CALIBRATING SENSORS"
 
+        startLiveActivity()
+
         Task {
             let totalSteps = 80
             for i in 1...totalSteps {
                 try? await Task.sleep(for: .milliseconds(100))
                 scanProgress = Double(i) / Double(totalSteps)
                 updateAnalysisText()
+                await updateLiveActivity()
             }
 
             phase = .analyzing
@@ -251,6 +258,7 @@ final class SkinScanViewModel {
                 scanError = "Unable to capture frame — please try again in better lighting"
                 isScanning = false
                 phase = .preScan
+                await endLiveActivity()
                 return
             }
 
@@ -266,6 +274,7 @@ final class SkinScanViewModel {
                 scanError = "Analysis failed — ensure your face is well-lit and centered"
                 isScanning = false
                 phase = .preScan
+                await endLiveActivity()
                 return
             }
 
@@ -281,9 +290,72 @@ final class SkinScanViewModel {
             currentResult = result
             scanHistory.insert(result, at: 0)
 
+            updateWidgetAfterScan(analysis: analysis)
+
             isScanning = false
             phase = .results
+            await endLiveActivity()
         }
+    }
+
+    private func startLiveActivity() {
+        let authInfo = ActivityAuthorizationInfo()
+        guard authInfo.areActivitiesEnabled else { return }
+
+        let attributes = ScanActivityAttributes(scanStartDate: Date())
+        let state = ScanActivityAttributes.ContentState(
+            progress: 0,
+            statusText: "Initializing scan...",
+            detailText: "CALIBRATING SENSORS",
+            currentMetric: "",
+            estimatedSecondsRemaining: 8
+        )
+
+        do {
+            currentActivity = try Activity.request(
+                attributes: attributes,
+                content: .init(state: state, staleDate: nil),
+                pushType: nil
+            )
+        } catch {
+            currentActivity = nil
+        }
+    }
+
+    private func updateLiveActivity() async {
+        guard let activity = currentActivity else { return }
+        let remaining = max(0, Int((1.0 - scanProgress) * 8))
+        let state = ScanActivityAttributes.ContentState(
+            progress: scanProgress,
+            statusText: analysisStatusText,
+            detailText: analysisDetailText,
+            currentMetric: analysisStatusText,
+            estimatedSecondsRemaining: remaining
+        )
+        await activity.update(.init(state: state, staleDate: nil))
+    }
+
+    private func endLiveActivity() async {
+        guard let activity = currentActivity else { return }
+        let finalState = ScanActivityAttributes.ContentState(
+            progress: 1.0,
+            statusText: "Scan Complete",
+            detailText: "RESULTS READY",
+            currentMetric: "",
+            estimatedSecondsRemaining: 0
+        )
+        await activity.end(.init(state: finalState, staleDate: nil), dismissalPolicy: .default)
+        currentActivity = nil
+    }
+
+    private func updateWidgetAfterScan(analysis: SkinAnalysisData) {
+        let shared = UserDefaults(suiteName: "group.app.rork.celleux-new-ui")
+        shared?.set(Int(analysis.overallScore.rounded()), forKey: "widgetSkinScore")
+        shared?.set(Date().timeIntervalSince1970, forKey: "widgetLastScanDate")
+        shared?.set(Int(analysis.textureEvennessScore.rounded()), forKey: "widgetTextureScore")
+        shared?.set(Int(analysis.apparentHydrationScore.rounded()), forKey: "widgetHydrationScore")
+        shared?.set(Int(analysis.brightnessRadianceScore.rounded()), forKey: "widgetRadianceScore")
+        WidgetCenter.shared.reloadTimelines(ofKind: "SkinScoreWidget")
     }
 
     private func saveToSwiftData(analysis: SkinAnalysisData, calibration calResult: CalibrationResult, modelContext: ModelContext) {

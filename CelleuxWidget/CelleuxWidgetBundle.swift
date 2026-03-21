@@ -5,5 +5,6 @@ import SwiftUI
 struct CelleuxWidgetBundle: WidgetBundle {
     var body: some Widget {
         SkinScoreWidget()
+        ScanLiveActivity()
     }
 }
