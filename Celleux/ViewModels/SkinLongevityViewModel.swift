@@ -13,6 +13,12 @@ final class SkinLongevityViewModel {
     var selectedPeriod: HistoryPeriod = .thirtyDays
     var lastUpdated: Date? = nil
 
+    var enabledFactorOverlays: Set<LongevityFactor> = []
+    var actionableInsights: [ActionableInsight] = []
+    var correlationStats: [CorrelationStat] = []
+    var showInsightTip: InsightTipItem? = nil
+    var hasSupplementData: Bool = false
+
     var sleepScore: Double? = nil
     var hrvScore: Double? = nil
     var restingHRScore: Double? = nil
@@ -72,6 +78,7 @@ final class SkinLongevityViewModel {
         computeScores(modelContext: modelContext)
         saveDailyScore(modelContext: modelContext)
         computeTrend(modelContext: modelContext)
+        refreshInsights(modelContext: modelContext)
 
         lastUpdated = Date()
         isLoading = false
@@ -100,6 +107,7 @@ final class SkinLongevityViewModel {
             computeScores(modelContext: modelContext)
             saveDailyScore(modelContext: modelContext)
             computeTrend(modelContext: modelContext)
+            refreshInsights(modelContext: modelContext)
             lastUpdated = Date()
         }
     }
@@ -469,4 +477,88 @@ final class SkinLongevityViewModel {
         guard uvExposure > 0 else { return "No data" }
         return String(format: "UV dose: %.1f", uvExposure)
     }
+
+    func toggleFactorOverlay(_ factor: LongevityFactor) {
+        if enabledFactorOverlays.contains(factor) {
+            enabledFactorOverlays.remove(factor)
+        } else {
+            enabledFactorOverlays.insert(factor)
+        }
+    }
+
+    func scoreForFactorFromDaily(_ factor: LongevityFactor, score: DailyLongevityScore) -> Double {
+        switch factor {
+        case .sleep: score.sleepScore
+        case .hrv: score.hrvScore
+        case .skinAnalysis: score.skinScore
+        case .adherence: score.adherenceScore
+        case .activity: score.activityScore
+        case .circadian: score.circadianScore
+        }
+    }
+
+    var missingDataSources: [MissingDataSource] {
+        var sources: [MissingDataSource] = []
+        if !hasWatchData {
+            sources.append(MissingDataSource(
+                title: "Apple Watch",
+                detail: "Unlock sleep, HRV, activity, and circadian insights",
+                icon: "applewatch",
+                action: .connectWatch
+            ))
+        }
+        if !hasSkinScan {
+            sources.append(MissingDataSource(
+                title: "Skin Scan",
+                detail: "Take your first scan for skin analysis data",
+                icon: "viewfinder",
+                action: .takeScan
+            ))
+        }
+        if !hasSupplementData {
+            sources.append(MissingDataSource(
+                title: "Protocol Tracking",
+                detail: "Start logging supplements for adherence scoring",
+                icon: "pill.fill",
+                action: .setupProtocol
+            ))
+        }
+        return sources
+    }
+
+    private func refreshInsights(modelContext: ModelContext) {
+        actionableInsights = correlationService.generateActionableInsights()
+
+        let calendar = Calendar.current
+        guard let ninetyAgo = calendar.date(byAdding: .day, value: -90, to: Date()) else { return }
+        let predicate = #Predicate<DailyLongevityScore> { s in s.date >= ninetyAgo }
+        let descriptor = FetchDescriptor<DailyLongevityScore>(predicate: predicate, sortBy: [SortDescriptor(\.date, order: .forward)])
+        let allScores = (try? modelContext.fetch(descriptor)) ?? []
+        correlationStats = correlationService.computeCorrelationStats(from: allScores)
+
+        let today = calendar.startOfDay(for: Date())
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: today) ?? today
+        let dosePredicate = #Predicate<SupplementDose> { dose in dose.date >= today && dose.date < tomorrow }
+        let doseDescriptor = FetchDescriptor<SupplementDose>(predicate: dosePredicate)
+        hasSupplementData = ((try? modelContext.fetchCount(doseDescriptor)) ?? 0) > 0
+    }
+}
+
+nonisolated struct MissingDataSource: Identifiable, Sendable {
+    let id = UUID()
+    let title: String
+    let detail: String
+    let icon: String
+    let action: MissingDataAction
+}
+
+nonisolated enum MissingDataAction: Sendable {
+    case connectWatch
+    case takeScan
+    case setupProtocol
+}
+
+struct InsightTipItem: Identifiable {
+    let id = UUID()
+    let text: String
 }

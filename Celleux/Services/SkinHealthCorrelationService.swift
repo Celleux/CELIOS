@@ -270,6 +270,184 @@ final class SkinHealthCorrelationService {
 
         return insights
     }
+
+    func generateActionableInsights() -> [ActionableInsight] {
+        var insights: [ActionableInsight] = []
+
+        if let hours = healthService.sleepData.totalHours, hours < 6 {
+            insights.append(ActionableInsight(
+                title: "Poor Sleep Last Night",
+                detail: String(format: "You slept %.1f hours — below the 7-9h optimal range. This may reduce collagen synthesis and slow skin repair.", hours),
+                icon: "moon.zzz.fill",
+                severity: .warning,
+                actionLabel: "Improve Sleep",
+                actionDestination: .tip("Try setting a consistent bedtime. Avoid screens 1 hour before sleep and keep your room cool (65-68°F)."),
+                priority: 8
+            ))
+        } else if let hours = healthService.sleepData.totalHours, hours >= 8 {
+            insights.append(ActionableInsight(
+                title: "Restorative Sleep",
+                detail: String(format: "%.1f hours of quality sleep is fueling your skin's overnight repair cycle.", hours),
+                icon: "moon.fill",
+                severity: .positive,
+                actionLabel: "Keep It Up",
+                actionDestination: .tip("Maintaining this sleep schedule consistently will compound benefits for your skin longevity."),
+                priority: 4
+            ))
+        }
+
+        if let hrv = healthService.latestHRV {
+            if hrv >= 60 {
+                insights.append(ActionableInsight(
+                    title: "HRV Elevated — Great Recovery",
+                    detail: String(format: "Your HRV is %.0f ms, indicating strong autonomic recovery and low stress load.", hrv),
+                    icon: "heart.fill",
+                    severity: .positive,
+                    actionLabel: "View Details",
+                    actionDestination: .openHealth,
+                    priority: 3
+                ))
+            } else if hrv < 35 {
+                insights.append(ActionableInsight(
+                    title: "Low HRV — Elevated Stress",
+                    detail: String(format: "Your HRV is %.0f ms. Elevated cortisol from stress can break down collagen and trigger inflammation.", hrv),
+                    icon: "brain.head.profile",
+                    severity: .warning,
+                    actionLabel: "Manage Stress",
+                    actionDestination: .tip("Try 5 minutes of deep breathing or a short walk. Even brief relaxation can lower cortisol."),
+                    priority: 7
+                ))
+            }
+        }
+
+        if let uvDose = healthService.todayUVExposure, uvDose > 5 {
+            insights.append(ActionableInsight(
+                title: "UV Exposure High",
+                detail: String(format: "UV dose today: %.1f — above the safe threshold. Prolonged exposure accelerates photoaging.", uvDose),
+                icon: "sun.max.trianglebadge.exclamationmark.fill",
+                severity: .critical,
+                actionLabel: "Apply SPF",
+                actionDestination: .tip("Reapply SPF 50+ every 2 hours when outdoors. Seek shade during peak UV hours (10 AM–4 PM)."),
+                priority: 9
+            ))
+        }
+
+        if let waterMl = healthService.todayWaterIntake, waterMl < 2000 {
+            let liters = waterMl / 1000
+            insights.append(ActionableInsight(
+                title: "Hydration Low",
+                detail: String(format: "You've had %.1fL today — aim for 2.5L. Dehydrated skin loses elasticity and barrier function.", liters),
+                icon: "drop.fill",
+                severity: .warning,
+                actionLabel: "Hydrate Now",
+                actionDestination: .tip("Drink a glass of water now and set hourly reminders. Add electrolytes for better absorption."),
+                priority: 7
+            ))
+        } else if let waterMl = healthService.todayWaterIntake, waterMl >= 2500 {
+            insights.append(ActionableInsight(
+                title: "Hydration On Point",
+                detail: String(format: "%.1fL today — excellent. Your skin barrier is well-supported.", waterMl / 1000),
+                icon: "drop.fill",
+                severity: .positive,
+                actionLabel: "Nice Work",
+                actionDestination: .tip("Consistent hydration is one of the easiest ways to support skin health long-term."),
+                priority: 2
+            ))
+        }
+
+        if stressRiskLevel == .high {
+            insights.append(ActionableInsight(
+                title: "Skin Flare-Up Risk",
+                detail: "Low HRV combined with negative mood significantly increases risk of stress-related skin issues like breakouts and sensitivity.",
+                icon: "exclamationmark.triangle.fill",
+                severity: .critical,
+                actionLabel: "Calm Down",
+                actionDestination: .tip("Consider a calming activity: meditation, gentle stretching, or a warm bath with magnesium salts."),
+                priority: 10
+            ))
+        }
+
+        if let cal = healthService.todayActiveCalories, cal >= 300 {
+            insights.append(ActionableInsight(
+                title: "Activity Boosting Skin",
+                detail: String(format: "%.0f kcal burned today. Exercise increases blood flow, delivering oxygen and nutrients to skin cells.", cal),
+                icon: "figure.run",
+                severity: .positive,
+                actionLabel: "Keep Moving",
+                actionDestination: .openHealth,
+                priority: 3
+            ))
+        }
+
+        return insights.sorted { $0.priority > $1.priority }
+    }
+
+    func computeCorrelationStats(from scores: [DailyLongevityScore]) -> [CorrelationStat] {
+        guard scores.count >= 5 else { return [] }
+        var stats: [CorrelationStat] = []
+
+        let goodSleepDays = scores.filter { $0.sleepScore >= 80 }
+        let poorSleepDays = scores.filter { $0.sleepScore > 0 && $0.sleepScore < 60 }
+        if goodSleepDays.count >= 3 && poorSleepDays.count >= 2 {
+            let goodAvg = goodSleepDays.map(\.skinScore).reduce(0, +) / Double(goodSleepDays.count)
+            let poorAvg = poorSleepDays.map(\.skinScore).reduce(0, +) / Double(poorSleepDays.count)
+            let delta = goodAvg - poorAvg
+            if abs(delta) > 3 {
+                stats.append(CorrelationStat(
+                    description: String(format: "When you sleep 8+ hours, your skin score is %.0f%% higher", delta),
+                    factor: "Sleep",
+                    delta: delta
+                ))
+            }
+        }
+
+        let highActivityDays = scores.filter { $0.activityScore >= 70 }
+        let lowActivityDays = scores.filter { $0.activityScore > 0 && $0.activityScore < 40 }
+        if highActivityDays.count >= 3 && lowActivityDays.count >= 2 {
+            let highAvg = highActivityDays.map(\.compositeScore).reduce(0, +) / Double(highActivityDays.count)
+            let lowAvg = lowActivityDays.map(\.compositeScore).reduce(0, +) / Double(lowActivityDays.count)
+            let delta = highAvg - lowAvg
+            if abs(delta) > 3 {
+                stats.append(CorrelationStat(
+                    description: String(format: "Active days correlate with %.0f%% higher longevity scores", delta),
+                    factor: "Activity",
+                    delta: delta
+                ))
+            }
+        }
+
+        let goodHydrationDays = scores.filter { $0.hydrationScore >= 75 }
+        let poorHydrationDays = scores.filter { $0.hydrationScore > 0 && $0.hydrationScore < 50 }
+        if goodHydrationDays.count >= 3 && poorHydrationDays.count >= 2 {
+            let goodAvg = goodHydrationDays.map(\.skinScore).reduce(0, +) / Double(goodHydrationDays.count)
+            let poorAvg = poorHydrationDays.map(\.skinScore).reduce(0, +) / Double(poorHydrationDays.count)
+            let delta = goodAvg - poorAvg
+            if abs(delta) > 2 {
+                stats.append(CorrelationStat(
+                    description: String(format: "Good hydration days show %.0f%% better skin scores", delta),
+                    factor: "Hydration",
+                    delta: delta
+                ))
+            }
+        }
+
+        let lowStressDays = scores.filter { $0.stressScore >= 70 }
+        let highStressDays = scores.filter { $0.stressScore > 0 && $0.stressScore < 45 }
+        if lowStressDays.count >= 3 && highStressDays.count >= 2 {
+            let lowAvg = lowStressDays.map(\.compositeScore).reduce(0, +) / Double(lowStressDays.count)
+            let highAvg = highStressDays.map(\.compositeScore).reduce(0, +) / Double(highStressDays.count)
+            let delta = lowAvg - highAvg
+            if abs(delta) > 3 {
+                stats.append(CorrelationStat(
+                    description: String(format: "Low-stress days produce %.0f%% higher overall scores", delta),
+                    factor: "Stress",
+                    delta: delta
+                ))
+            }
+        }
+
+        return stats
+    }
 }
 
 nonisolated enum SkinHealthFactor: String, Identifiable, CaseIterable, Sendable {

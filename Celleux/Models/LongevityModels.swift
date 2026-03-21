@@ -58,17 +58,41 @@ final class SupplementDose {
 }
 
 nonisolated enum HistoryPeriod: String, CaseIterable, Sendable {
+    case sevenDays = "7D"
     case thirtyDays = "30D"
-    case sixtyDays = "60D"
     case ninetyDays = "90D"
 
     var days: Int {
         switch self {
+        case .sevenDays: 7
         case .thirtyDays: 30
-        case .sixtyDays: 60
         case .ninetyDays: 90
         }
     }
+}
+
+nonisolated struct ActionableInsight: Identifiable, Sendable {
+    let id = UUID()
+    let title: String
+    let detail: String
+    let icon: String
+    let severity: InsightSeverity
+    let actionLabel: String
+    let actionDestination: InsightAction
+    let priority: Int
+}
+
+nonisolated enum InsightAction: Sendable {
+    case openHealth
+    case openScan
+    case openProtocol
+    case tip(String)
+}
+
+nonisolated struct CorrelationStat: Sendable {
+    let description: String
+    let factor: String
+    let delta: Double
 }
 
 nonisolated enum LongevityFactor: String, Identifiable, CaseIterable, Sendable {

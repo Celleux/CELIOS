@@ -1,29 +1,39 @@
-# Skin Longevity Score — Real HealthKit Integration (Parts 1-3)
+# Correlation Insights, Historical View & Missing Data Handling
 
-## What's Changing
+## Features
 
-### 1. Fix Hardcoded Fallback — Optional Skin Score
-- The longevity composite score will become **optional** — if no skin scan exists, the score shows as empty instead of a misleading number
-- The longevity score view will show a **"Take Your First Scan"** call-to-action card when no scan data is available, with a viewfinder icon and styled in the existing GlassCard design
-- The hero ring will show an empty/dashed state when no composite score exists
-- Factor cards for "Skin Analysis" will show "No scan yet" with a prompt to scan, instead of displaying 0
+### 4. Correlation Insights
+- Real-time insight cards generated from actual HealthKit data via `SkinHealthCorrelationService`
+- Each insight shows an icon, descriptive text, and an action button (e.g. "Improve Sleep", "Hydrate", "Apply SPF")
+- Insights include: poor sleep warning (sleep < 6h), HRV recovery status (vs personal average), UV overexposure alert (UV > 5), hydration reminder (water < 2L), activity boost, stress flare-up risk
+- Cards appear in priority order — most urgent first
+- Tap action button for contextual advice (navigates to relevant section or shows tip)
+- Each insight card uses the existing `GlassCard` design with severity-based accent colors (gold for positive, amber for warning, red for critical)
 
-### 2. Real Composite Scoring with Proper Mappings
-- **Sleep Score**: Maps total hours to a curve — 7-9h = 90-100, 6h = 60, <5h = 20-40. Deep sleep and REM percentages weighted in (40% deep, 30% REM, 30% duration)
-- **HRV Score**: Age-adjusted percentile mapping — HRV ≥60ms = 85+, 40-60ms = 55-85, 20-40ms = 25-55, <20ms = low. Uses personal baseline when available
-- **Skin Score**: Reads latest scan's `overallScore` from SwiftData (not just UserDefaults). Returns nil if no scan → triggers empty state
-- **Adherence Score**: Percentage of today's supplement doses completed from SwiftData `SupplementDose` records. Streak bonus: +5 for 7+ days, +10 for 14+, +15 for 30+
-- **Activity Score**: Maps active calories toward WHO target (300 kcal/day ≈ 150min/week moderate). VO₂ max component weighted 50/50 with calories
-- **Circadian Score**: Measures how close supplement timing matches circadian windows. Uses wrist temperature rhythm + sleep schedule consistency
+### 5. Historical View
+- Swift Charts `AreaMark` + `LineMark` showing composite longevity score over time
+- Time range toggle: 7 days / 30 days / 90 days (added 7-day option to existing picker)
+- Toggle individual factors on/off as chart overlays (sleep, HRV, skin, adherence, activity, circadian)
+- Gold gradient fill under the main line, catmullRom interpolation for smooth curves
+- Tap on a data point to see that day's full breakdown in a tooltip
+- Computed correlation insight: e.g. "When you sleep 8+ hours, your skin score is 12% higher" — calculated from real stored `DailyLongevityScore` data, not a template
 
-### 3. Real-Time Updates
-- HealthKit data **auto-refreshes on view appear** and then **every 15 minutes** via a background timer while the view is visible
-- When scores recompute, values animate smoothly using spring animations and `.contentTransition(.numericText)`
-- A **"Last updated" timestamp** appears below the hero score — e.g. "Updated 2 min ago" — and updates live
-- The timer pauses when the view disappears and resumes when it reappears
-- A subtle pulse animation on the ring when data refreshes to signal freshness
+### 6. Missing Data Handling
+- No Apple Watch: Show available factors (skin + adherence), gray out watch-dependent ones with a lock icon and "Requires Apple Watch" label
+- No scan data: Show health-only factors, prominent "Take Your First Scan" card with scan button
+- No supplement tracking: Show biometric factors only, hide adherence with a setup prompt
+- Every missing source shows a clean empty state with a specific call-to-action
+- Never display fake/default numbers — use `nil` and show "—" placeholder
 
-### Files Modified
-- **SkinLongevityViewModel** — Optional composite score, improved scoring algorithms, refresh timer, last-updated tracking
-- **SkinLongevityScoreView** — Empty state CTA, animated transitions, last-updated label, timer lifecycle
-- **LongevityModels** — No structural changes needed
+## Design
+- Insight cards: `CompactGlassCard` with severity-colored icon circle (radial gradient), bold title, descriptive body text, and a small action button
+- Historical chart: Full-width `GlassCard` with the Swift Charts area chart, factor toggle chips as horizontally scrollable capsule buttons below the chart
+- Correlation stat: A small highlighted callout card below the chart with a lightbulb icon and the computed correlation text
+- Missing data states: Centered icon + message + CTA button, consistent with existing empty states in the app
+- All animations use `CelleuxSpring.luxury`, staggered appearance delays, `.sensoryFeedback` on interactions
+
+## Changes
+- **SkinHealthCorrelationService**: Add method to generate actionable insight cards with action labels and computed correlations from stored data
+- **SkinLongevityViewModel**: Add factor toggle state, correlation computation from `DailyLongevityScore` history, and missing-data detection helpers
+- **SkinLongevityScoreView**: Add correlation insights section, upgraded historical chart with factor overlays + toggles, correlation callout, and improved missing-data empty states throughout
+- **LongevityModels**: Add 7-day option to `HistoryPeriod` enum

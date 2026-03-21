@@ -12,6 +12,8 @@ struct SkinLongevityScoreView: View {
     @State private var showCalculation: Bool = false
     @State private var refreshPulse: Bool = false
     @State private var navigateToScan: Bool = false
+    @State private var insightTipTrigger: Bool = false
+    @State private var navigateToProtocol: Bool = false
 
     var body: some View {
         ScrollView {
@@ -24,19 +26,29 @@ struct SkinLongevityScoreView: View {
                         .staggeredAppear(appeared: appeared, delay: 0)
                 }
 
-                if !viewModel.hasWatchData && !viewModel.isLoading {
-                    connectWatchCard
-                        .staggeredAppear(appeared: appeared, delay: 0.08)
+                if !viewModel.missingDataSources.isEmpty && !viewModel.isLoading {
+                    missingDataSection
+                        .staggeredAppear(appeared: appeared, delay: 0.06)
+                }
+
+                if !viewModel.actionableInsights.isEmpty {
+                    insightsSection
+                        .staggeredAppear(appeared: appeared, delay: 0.10)
                 }
 
                 factorsSection
-                    .staggeredAppear(appeared: appeared, delay: 0.12)
+                    .staggeredAppear(appeared: appeared, delay: 0.16)
 
                 historySection
-                    .staggeredAppear(appeared: appeared, delay: 0.20)
+                    .staggeredAppear(appeared: appeared, delay: 0.22)
+
+                if !viewModel.correlationStats.isEmpty {
+                    correlationStatsSection
+                        .staggeredAppear(appeared: appeared, delay: 0.28)
+                }
 
                 calculationSection
-                    .staggeredAppear(appeared: appeared, delay: 0.26)
+                    .staggeredAppear(appeared: appeared, delay: 0.32)
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
@@ -48,8 +60,17 @@ struct SkinLongevityScoreView: View {
         .navigationBarTitleDisplayMode(.large)
         .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.3), trigger: showCalculation)
         .sensoryFeedback(.success, trigger: refreshPulse)
+        .sensoryFeedback(.selection, trigger: insightTipTrigger)
         .navigationDestination(isPresented: $navigateToScan) {
             ScanView()
+        }
+        .navigationDestination(isPresented: $navigateToProtocol) {
+            RitualView()
+        }
+        .sheet(item: $viewModel.showInsightTip) { tipItem in
+            insightTipSheet(tipItem.text)
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
         }
         .task {
             await viewModel.loadData(modelContext: modelContext)
@@ -68,6 +89,8 @@ struct SkinLongevityScoreView: View {
             viewModel.stopAutoRefresh()
         }
     }
+
+    // MARK: - Hero
 
     private var heroSection: some View {
         VStack(spacing: 16) {
@@ -202,61 +225,221 @@ struct SkinLongevityScoreView: View {
         )
     }
 
-    private var connectWatchCard: some View {
-        GlassCard(depth: .elevated) {
-            VStack(spacing: 16) {
+    // MARK: - Missing Data
+
+    private var missingDataSection: some View {
+        VStack(spacing: 10) {
+            ForEach(viewModel.missingDataSources) { source in
+                missingDataCard(source)
+            }
+        }
+    }
+
+    private func missingDataCard(_ source: MissingDataSource) -> some View {
+        CompactGlassCard(cornerRadius: 18) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [CelleuxColors.warmGold.opacity(0.10), CelleuxColors.warmGold.opacity(0.02)],
+                                center: .center,
+                                startRadius: 0,
+                                endRadius: 20
+                            )
+                        )
+                        .frame(width: 40, height: 40)
+
+                    Circle()
+                        .stroke(CelleuxColors.goldChromeBorder, lineWidth: 0.8)
+                        .frame(width: 40, height: 40)
+
+                    Image(systemName: source.icon)
+                        .font(.system(size: 16, weight: .light))
+                        .foregroundStyle(CelleuxColors.warmGold)
+                }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(source.title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(CelleuxColors.textPrimary)
+
+                    Text(source.detail)
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundStyle(CelleuxColors.textLabel)
+                        .lineLimit(2)
+                }
+
+                Spacer(minLength: 0)
+
+                Button {
+                    handleMissingDataAction(source.action)
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(CelleuxColors.warmGold)
+                }
+            }
+        }
+    }
+
+    private func handleMissingDataAction(_ action: MissingDataAction) {
+        switch action {
+        case .connectWatch:
+            if let url = URL(string: "x-apple-health://") {
+                UIApplication.shared.open(url)
+            }
+        case .takeScan:
+            navigateToScan = true
+        case .setupProtocol:
+            navigateToProtocol = true
+        }
+    }
+
+    // MARK: - Correlation Insights
+
+    private var insightsSection: some View {
+        VStack(spacing: 14) {
+            SectionHeader(title: "Health & Skin Insights")
+
+            VStack(spacing: 10) {
+                ForEach(viewModel.actionableInsights) { insight in
+                    actionableInsightCard(insight)
+                }
+            }
+        }
+    }
+
+    private func actionableInsightCard(_ insight: ActionableInsight) -> some View {
+        let accentColor = insightAccentColor(insight.severity)
+
+        return CompactGlassCard(cornerRadius: 20) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 12) {
                     ZStack {
                         Circle()
                             .fill(
                                 RadialGradient(
-                                    colors: [CelleuxColors.warmGold.opacity(0.12), CelleuxColors.warmGold.opacity(0.02)],
+                                    colors: [accentColor.opacity(0.14), accentColor.opacity(0.02)],
                                     center: .center,
                                     startRadius: 0,
-                                    endRadius: 28
+                                    endRadius: 22
                                 )
                             )
-                            .frame(width: 52, height: 52)
+                            .frame(width: 44, height: 44)
 
                         Circle()
-                            .stroke(
-                                AngularGradient(
-                                    colors: [CelleuxColors.warmGold.opacity(0.6), CelleuxColors.warmGold.opacity(0.15), CelleuxColors.warmGold.opacity(0.5)],
-                                    center: .center
-                                ),
-                                lineWidth: 1
-                            )
-                            .frame(width: 52, height: 52)
+                            .stroke(accentColor.opacity(0.3), lineWidth: 1)
+                            .frame(width: 44, height: 44)
 
-                        Image(systemName: "applewatch")
-                            .font(.system(size: 22, weight: .light))
-                            .foregroundStyle(CelleuxColors.warmGold)
+                        Image(systemName: insight.icon)
+                            .font(.system(size: 18, weight: .light))
+                            .foregroundStyle(accentColor)
                     }
-                    .shadow(color: CelleuxColors.warmGold.opacity(0.2), radius: 10, x: 0, y: 4)
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Connect Apple Watch")
-                            .font(.system(size: 16, weight: .semibold))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(insight.title)
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(CelleuxColors.textPrimary)
 
-                        Text("Unlock sleep, HRV, activity, and circadian insights for a complete longevity score.")
+                        Text(insight.detail)
                             .font(.system(size: 12, weight: .regular))
                             .foregroundStyle(CelleuxColors.textLabel)
                             .lineSpacing(2)
+                            .lineLimit(3)
                     }
+
+                    Spacer(minLength: 0)
                 }
 
-                Button {} label: {
-                    Text("Open Health Settings")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(CelleuxColors.warmGold)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
+                Button {
+                    insightTipTrigger.toggle()
+                    handleInsightAction(insight.actionDestination)
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(insight.actionLabel)
+                            .font(.system(size: 12, weight: .semibold))
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 10, weight: .bold))
+                    }
+                    .foregroundStyle(accentColor)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule()
+                            .fill(accentColor.opacity(0.08))
+                    )
+                    .overlay(
+                        Capsule()
+                            .stroke(accentColor.opacity(0.2), lineWidth: 0.5)
+                    )
                 }
-                .buttonStyle(GlassButtonStyle(style: .primary))
             }
         }
     }
+
+    private func handleInsightAction(_ action: InsightAction) {
+        switch action {
+        case .openHealth:
+            if let url = URL(string: "x-apple-health://") {
+                UIApplication.shared.open(url)
+            }
+        case .openScan:
+            navigateToScan = true
+        case .openProtocol:
+            navigateToProtocol = true
+        case .tip(let text):
+            viewModel.showInsightTip = InsightTipItem(text: text)
+        }
+    }
+
+    private func insightTipSheet(_ tip: String) -> some View {
+        VStack(spacing: 24) {
+            VStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [CelleuxColors.warmGold.opacity(0.12), CelleuxColors.warmGold.opacity(0.02)],
+                                center: .center,
+                                startRadius: 0,
+                                endRadius: 28
+                            )
+                        )
+                        .frame(width: 56, height: 56)
+
+                    Image(systemName: "lightbulb.fill")
+                        .font(.system(size: 24, weight: .light))
+                        .foregroundStyle(CelleuxColors.warmGold)
+                }
+
+                Text("Recommendation")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(CelleuxColors.textPrimary)
+            }
+
+            Text(tip)
+                .font(.system(size: 15, weight: .regular))
+                .foregroundStyle(CelleuxColors.textSecondary)
+                .multilineTextAlignment(.center)
+                .lineSpacing(4)
+
+            Spacer()
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 32)
+    }
+
+    private func insightAccentColor(_ severity: InsightSeverity) -> Color {
+        switch severity {
+        case .positive: CelleuxColors.warmGold
+        case .neutral: CelleuxColors.silver
+        case .warning: Color(hex: "FF9800")
+        case .critical: Color(hex: "E53935")
+        }
+    }
+
+    // MARK: - Factors
 
     private var factorsSection: some View {
         VStack(spacing: 14) {
@@ -266,6 +449,8 @@ struct SkinLongevityScoreView: View {
                 ForEach(LongevityFactor.allCases) { factor in
                     if viewModel.hasWatchData || !factor.requiresWatch {
                         factorCard(factor)
+                    } else {
+                        grayedOutFactorCard(factor)
                     }
                 }
             }
@@ -350,7 +535,7 @@ struct SkinLongevityScoreView: View {
                 }
                 .frame(height: 4)
 
-                if factor.requiresWatch {
+                if factor.requiresWatch && !viewModel.hasWatchData {
                     HStack(spacing: 4) {
                         Image(systemName: "applewatch")
                             .font(.system(size: 9, weight: .medium))
@@ -368,6 +553,59 @@ struct SkinLongevityScoreView: View {
         }
     }
 
+    private func grayedOutFactorCard(_ factor: LongevityFactor) -> some View {
+        CompactGlassCard(cornerRadius: 20) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [CelleuxColors.silver.opacity(0.08), CelleuxColors.silver.opacity(0.02)],
+                                center: .center,
+                                startRadius: 0,
+                                endRadius: 20
+                            )
+                        )
+                        .frame(width: 42, height: 42)
+
+                    Circle()
+                        .stroke(CelleuxColors.chromeBorder, lineWidth: 0.8)
+                        .frame(width: 42, height: 42)
+
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 14, weight: .light))
+                        .foregroundStyle(CelleuxColors.silver.opacity(0.5))
+                }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(factor.title.uppercased())
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(CelleuxColors.textLabel.opacity(0.5))
+                        .tracking(1.2)
+
+                    HStack(spacing: 4) {
+                        Image(systemName: "applewatch")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(CelleuxColors.silver.opacity(0.6))
+
+                        Text("Requires Apple Watch")
+                            .font(.system(size: 11, weight: .regular))
+                            .foregroundStyle(CelleuxColors.textLabel.opacity(0.5))
+                    }
+                }
+
+                Spacer()
+
+                Text("—")
+                    .font(.system(size: 24, weight: .thin))
+                    .foregroundStyle(CelleuxColors.textLabel.opacity(0.3))
+            }
+        }
+        .opacity(0.7)
+    }
+
+    // MARK: - History
+
     private var historySection: some View {
         VStack(spacing: 14) {
             SectionHeader(title: "Score history")
@@ -383,6 +621,8 @@ struct SkinLongevityScoreView: View {
                 emptyHistoryCard
             } else {
                 historyChart
+
+                factorOverlayToggles
             }
         }
     }
@@ -400,6 +640,19 @@ struct SkinLongevityScoreView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Chart {
                     ForEach(filteredScores, id: \.date) { score in
+                        AreaMark(
+                            x: .value("Date", score.date),
+                            y: .value("Score", score.compositeScore)
+                        )
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [CelleuxColors.warmGold.opacity(0.18), CelleuxColors.warmGold.opacity(0.02)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .interpolationMethod(.catmullRom)
+
                         LineMark(
                             x: .value("Date", score.date),
                             y: .value("Score", score.compositeScore)
@@ -407,19 +660,19 @@ struct SkinLongevityScoreView: View {
                         .foregroundStyle(CelleuxColors.dataGold)
                         .interpolationMethod(.catmullRom)
                         .lineStyle(StrokeStyle(lineWidth: 2.5))
+                    }
 
-                        AreaMark(
-                            x: .value("Date", score.date),
-                            y: .value("Score", score.compositeScore)
-                        )
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [Color(hex: "6B3FA0").opacity(0.15), Color(hex: "6B3FA0").opacity(0.02)],
-                                startPoint: .top,
-                                endPoint: .bottom
+                    ForEach(Array(viewModel.enabledFactorOverlays), id: \.self) { factor in
+                        ForEach(filteredScores, id: \.date) { score in
+                            LineMark(
+                                x: .value("Date", score.date),
+                                y: .value(factor.title, viewModel.scoreForFactorFromDaily(factor, score: score)),
+                                series: .value("Factor", factor.title)
                             )
-                        )
-                        .interpolationMethod(.catmullRom)
+                            .foregroundStyle(colorForOverlayFactor(factor))
+                            .interpolationMethod(.catmullRom)
+                            .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [5, 3]))
+                        }
                     }
 
                     if let selected = selectedChartDate,
@@ -473,17 +726,101 @@ struct SkinLongevityScoreView: View {
 
                 if let selected = selectedChartDate,
                    let score = filteredScores.min(by: { abs($0.date.timeIntervalSince(selected)) < abs($1.date.timeIntervalSince(selected)) }) {
-                    HStack {
-                        Text(score.date, style: .date)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(CelleuxColors.textLabel)
-                        Spacer()
-                        Text("\(Int(score.compositeScore))/100")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(CelleuxColors.warmGold)
+                    selectedDayBreakdown(score)
+                }
+            }
+        }
+    }
+
+    private func selectedDayBreakdown(_ score: DailyLongevityScore) -> some View {
+        VStack(spacing: 8) {
+            HStack {
+                Text(score.date, style: .date)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(CelleuxColors.textLabel)
+                Spacer()
+                Text("\(Int(score.compositeScore))/100")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(CelleuxColors.warmGold)
+                    .contentTransition(.numericText())
+            }
+
+            PremiumDivider()
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
+                dayBreakdownPill(label: "Sleep", value: score.sleepScore)
+                dayBreakdownPill(label: "HRV", value: score.hrvScore)
+                dayBreakdownPill(label: "Skin", value: score.skinScore)
+                dayBreakdownPill(label: "Adherence", value: score.adherenceScore)
+                dayBreakdownPill(label: "Activity", value: score.activityScore)
+                dayBreakdownPill(label: "Circadian", value: score.circadianScore)
+            }
+        }
+    }
+
+    private func dayBreakdownPill(label: String, value: Double) -> some View {
+        VStack(spacing: 2) {
+            Text(value > 0 ? "\(Int(value))" : "—")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(value > 0 ? CelleuxColors.textPrimary : CelleuxColors.textLabel)
+                .contentTransition(.numericText())
+            Text(label)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(CelleuxColors.textLabel)
+                .tracking(0.3)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(CelleuxColors.silver.opacity(0.04))
+        )
+    }
+
+    private var factorOverlayToggles: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(LongevityFactor.allCases) { factor in
+                    let isActive = viewModel.enabledFactorOverlays.contains(factor)
+                    Button {
+                        withAnimation(CelleuxSpring.snappy) {
+                            viewModel.toggleFactorOverlay(factor)
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Circle()
+                                .fill(colorForOverlayFactor(factor))
+                                .frame(width: 6, height: 6)
+
+                            Text(factor.title)
+                                .font(.system(size: 11, weight: isActive ? .semibold : .regular))
+                                .foregroundStyle(isActive ? CelleuxColors.textPrimary : CelleuxColors.textLabel)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(
+                            Capsule()
+                                .fill(isActive ? colorForOverlayFactor(factor).opacity(0.10) : CelleuxColors.silver.opacity(0.04))
+                        )
+                        .overlay(
+                            Capsule()
+                                .stroke(isActive ? colorForOverlayFactor(factor).opacity(0.3) : CelleuxColors.silver.opacity(0.1), lineWidth: 0.5)
+                        )
                     }
                 }
             }
+        }
+        .contentMargins(.horizontal, 4)
+    }
+
+    private func colorForOverlayFactor(_ factor: LongevityFactor) -> Color {
+        switch factor {
+        case .sleep: CelleuxP3.chartSilver
+        case .hrv: CelleuxColors.roseGold
+        case .skinAnalysis: CelleuxColors.warmGold
+        case .adherence: CelleuxP3.chartGold
+        case .activity: Color(.displayP3, red: 0.4, green: 0.7, blue: 0.85)
+        case .circadian: CelleuxP3.chartChampagne
         }
     }
 
@@ -505,6 +842,63 @@ struct SkinLongevityScoreView: View {
             .frame(maxWidth: .infinity)
         }
     }
+
+    // MARK: - Correlation Stats
+
+    private var correlationStatsSection: some View {
+        VStack(spacing: 14) {
+            SectionHeader(title: "Discovered correlations")
+
+            VStack(spacing: 10) {
+                ForEach(Array(viewModel.correlationStats.enumerated()), id: \.offset) { _, stat in
+                    correlationStatCard(stat)
+                }
+            }
+        }
+    }
+
+    private func correlationStatCard(_ stat: CorrelationStat) -> some View {
+        CompactGlassCard(cornerRadius: 18) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [CelleuxColors.warmGold.opacity(0.12), CelleuxColors.warmGold.opacity(0.02)],
+                                center: .center,
+                                startRadius: 0,
+                                endRadius: 18
+                            )
+                        )
+                        .frame(width: 36, height: 36)
+
+                    Image(systemName: "lightbulb.fill")
+                        .font(.system(size: 14, weight: .light))
+                        .foregroundStyle(CelleuxColors.warmGold)
+                }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(stat.description)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(CelleuxColors.textPrimary)
+                        .lineLimit(2)
+
+                    Text("Based on your \(stat.factor.lowercased()) data")
+                        .font(.system(size: 10, weight: .regular))
+                        .foregroundStyle(CelleuxColors.textLabel)
+                }
+
+                Spacer(minLength: 0)
+
+                Text(String(format: "%+.0f%%", stat.delta))
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(stat.delta > 0 ? CelleuxColors.warmGold : Color(hex: "FF9800"))
+                    .contentTransition(.numericText())
+            }
+        }
+    }
+
+    // MARK: - Calculation
 
     private var calculationSection: some View {
         GlassCard(cornerRadius: 20) {
