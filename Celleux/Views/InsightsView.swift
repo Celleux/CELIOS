@@ -108,7 +108,11 @@ struct InsightsView: View {
                 }
             }
 
-            if !hasEnoughScans {
+            if !insightEngine.dataSources.hasAnyData {
+                noDataAtAllCard
+            } else if !hasEnoughScans && !insightEngine.dataSources.hasHealthKit {
+                notEnoughScansCard
+            } else if !hasEnoughScans {
                 notEnoughScansCard
             } else if insightEngine.insights.isEmpty {
                 noInsightsCard
@@ -120,6 +124,8 @@ struct InsightsView: View {
                     }
                 }
             }
+
+            dataSourcesIndicator
         }
         .staggeredAppear(appeared: appeared, delay: 0)
     }
@@ -177,6 +183,72 @@ struct InsightsView: View {
             }
             .frame(maxWidth: .infinity)
         }
+    }
+
+    private var noDataAtAllCard: some View {
+        GlassCard(depth: .elevated) {
+            VStack(spacing: 20) {
+                ChromeIconBadge("wand.and.stars", size: 56)
+                    .symbolEffect(.breathe, isActive: appeared)
+
+                VStack(spacing: 8) {
+                    Text("Let's get started")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(CelleuxColors.textPrimary)
+
+                    Text("Your personalized insights will appear here once you start scanning and tracking. Each data point helps us understand your skin better.")
+                        .font(.system(size: 14, weight: .regular))
+                        .foregroundStyle(CelleuxColors.textLabel)
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(3)
+                }
+
+                VStack(spacing: 10) {
+                    dataSourceRow(icon: "viewfinder", label: "Take your first skin scan", active: false)
+                    dataSourceRow(icon: "heart.fill", label: "Connect Apple Health", active: false)
+                    dataSourceRow(icon: "pills.fill", label: "Start your supplement protocol", active: false)
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private var dataSourcesIndicator: some View {
+        let sources = insightEngine.dataSources
+        return HStack(spacing: 16) {
+            dataSourceChip(icon: "viewfinder", label: "Scans", active: sources.hasScans)
+            dataSourceChip(icon: "heart.fill", label: "Health", active: sources.hasHealthKit)
+            dataSourceChip(icon: "pills.fill", label: "Supplements", active: sources.hasSupplements)
+        }
+        .padding(.top, 4)
+    }
+
+    private func dataSourceChip(icon: String, label: String, active: Bool) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: active ? "checkmark.circle.fill" : "circle.dashed")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(active ? CelleuxColors.warmGold : CelleuxColors.textLabel.opacity(0.5))
+            Text(label)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(active ? CelleuxColors.textSecondary : CelleuxColors.textLabel.opacity(0.5))
+        }
+    }
+
+    private func dataSourceRow(icon: String, label: String, active: Bool) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(active ? CelleuxColors.warmGold : CelleuxColors.textLabel)
+                .frame(width: 24)
+            Text(label)
+                .font(.system(size: 14, weight: .regular))
+                .foregroundStyle(active ? CelleuxColors.textPrimary : CelleuxColors.textSecondary)
+            Spacer()
+            Image(systemName: active ? "checkmark.circle.fill" : "arrow.right.circle")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(active ? CelleuxColors.warmGold : CelleuxColors.textLabel.opacity(0.4))
+        }
+        .padding(.horizontal, 16)
     }
 
     @ViewBuilder

@@ -1,38 +1,25 @@
-# Insights Feed — Personalized Intelligence Engine & Card UI
+# Upgrade Insight Tone & Data Validation Rules
 
-## Features
+## What's Changing
 
-**1. Insight Generation Engine**
-- New `InsightEngine` class that pulls real data from four sources: skin scan history, HealthKit correlations, supplement dose records, and circadian timing alignment
-- Generates insights only when underlying data exists — never fabricates numbers
-- Sorts insights by relevance (highest impact + newest first)
+Two focused improvements to the Insights & AI Coach feature:
 
-**2. Five Insight Types — All Data-Driven**
-- **Trend Alerts**: Detects when any skin metric (texture, hydration, redness, etc.) changes by 3+ points across 3 or more scans, e.g. "Your texture score improved 5 points this week"
-- **Correlation Discoveries**: Finds statistical patterns in historical data (sleep vs. skin, hydration vs. redness), e.g. "When you sleep 8+ hours, your redness drops 15%"
-- **Action Items**: Flags when current metrics fall below your personal baseline (low hydration, poor sleep, high UV), with a specific next step
-- **Celebrations**: Triggers when you hit a new personal best on any score
-- **Weekly Summary**: Auto-generated every Sunday evening summarizing skin score change, sleep quality trend, and adherence percentage
+---
 
-**3. Insight Card Feed UI**
-- Vertical scrolling feed of glass cards, each showing: themed icon, title, body text, relative timestamp, and an optional action button
-- Cards appear with staggered entrance animation
-- Tap a card to expand it with a smooth matched geometry transition, revealing full detail and suggested action
-- Pull-to-refresh regenerates all insights with the gold spinner animation
-- Haptic feedback on card tap
-- If fewer than 3 scans exist: shows a friendly "Scan more to unlock personalized insights" prompt instead of the feed
-- If no HealthKit data: shows scan-only insights with a prompt to connect Apple Watch
-- Existing chart sections (skin score trend, mood correlation, score breakdown, health correlation link, recent activity) remain below the new insight feed
+### **Feature 1: Encouraging, Personal Narrative Tone**
 
-**4. Encouraging Narrative Tone**
-- All text is warm and supportive — "Your skin is responding well" not "Score: 78"
-- References your specific patterns and habits
-- Every insight includes a concrete next step
+- **Rewrite all insight messages** to feel warm and encouraging (like Gentler Streak), never clinical or judgmental
+- Every insight will **reference the user's specific data** — e.g. "Your skin responded well to last night's 8.2 hours of sleep" instead of generic "Sleep is good"
+- Every insight will include a **concrete, actionable next step** — e.g. "Try adding 15 minutes to tonight's sleep" instead of "Consider adjusting your routine"
+- Celebration messages will feel genuinely delightful — "You've been on a roll! Your texture just hit a new personal best"
+- Negative trends framed as opportunities — "Your hydration dipped a bit — a glass of water now can help your skin bounce back"
+- Weekly summaries read like a friendly coach recap, not a data report
 
-## Design
+### **Feature 2: Strict Data Validation Rules**
 
-- Each insight card uses the existing `GlassCard` with a colored accent strip on the left edge: gold for celebrations, silver for trends, soft amber for action items, champagne for correlations, muted for weekly summaries
-- Icon badge uses `ChromeIconBadge` with context-appropriate SF Symbol
-- Expanded card shows additional detail text and an action button styled with `GlassButtonStyle`
-- The existing timeframe picker, charts, correlation card, mood section, score breakdown, and recent activity sections remain at the bottom of the scroll — the insight feed sits at the top as the new hero content
-- Maintains the existing Celleux mesh background and design system throughout
+- **Less than 3 scans**: Only show the "Scan more to unlock insights" prompt — no trend alerts, no celebrations, no correlation discoveries generated
+- **No HealthKit / no Apple Watch**: Skip all health-dependent insights (sleep, HRV, hydration, UV, activity). Show only scan-based insights (trends, celebrations, personal bests)
+- **No supplement tracking data**: Skip adherence-related insights entirely
+- **Mixed availability**: Show whatever insights have real backing data, never fill gaps with defaults or estimates
+- Add a small **"Data Sources" indicator** at the bottom of the insight feed showing which sources are active (Scans ✓, HealthKit ✓, Supplements ✗) so the user understands why certain insights are missing
+- If zero data sources are available, show a friendly empty state with clear next steps to get started
