@@ -349,13 +349,25 @@ final class SkinScanViewModel {
     }
 
     private func updateWidgetAfterScan(analysis: SkinAnalysisData) {
-        let shared = UserDefaults(suiteName: "group.app.rork.celleux-new-ui")
-        shared?.set(Int(analysis.overallScore.rounded()), forKey: "widgetSkinScore")
-        shared?.set(Date().timeIntervalSince1970, forKey: "widgetLastScanDate")
-        shared?.set(Int(analysis.textureEvennessScore.rounded()), forKey: "widgetTextureScore")
-        shared?.set(Int(analysis.apparentHydrationScore.rounded()), forKey: "widgetHydrationScore")
-        shared?.set(Int(analysis.brightnessRadianceScore.rounded()), forKey: "widgetRadianceScore")
-        WidgetCenter.shared.reloadTimelines(ofKind: "SkinScoreWidget")
+        let newScore = Int(analysis.overallScore.rounded())
+        let prevScore = scanHistory.first?.overallScore
+        let trend: String
+        if let prev = prevScore {
+            if newScore > prev + 1 { trend = "up" }
+            else if newScore < prev - 1 { trend = "down" }
+            else { trend = "stable" }
+        } else {
+            trend = "stable"
+        }
+
+        WidgetDataService.shared.writeAllData(
+            score: newScore,
+            trend: trend,
+            lastScanDate: Date(),
+            textureScore: Int(analysis.textureEvennessScore.rounded()),
+            hydrationScore: Int(analysis.apparentHydrationScore.rounded()),
+            radianceScore: Int(analysis.brightnessRadianceScore.rounded())
+        )
     }
 
     private func saveToSwiftData(analysis: SkinAnalysisData, calibration calResult: CalibrationResult, modelContext: ModelContext) {

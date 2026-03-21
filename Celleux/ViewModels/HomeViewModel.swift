@@ -234,9 +234,6 @@ final class HomeViewModel {
     }
 
     private func updateWidgetData(modelContext: ModelContext) {
-        let shared = UserDefaults(suiteName: "group.app.rork.celleux-new-ui")
-        shared?.set(Int(targetScore), forKey: "widgetSkinScore")
-
         let trendString: String
         if scoreTrend > 1 {
             trendString = "up"
@@ -245,20 +242,18 @@ final class HomeViewModel {
         } else {
             trendString = "stable"
         }
-        shared?.set(trendString, forKey: "widgetSkinTrend")
-
-        if let lastScan = lastScanDate {
-            shared?.set(lastScan.timeIntervalSince1970, forKey: "widgetLastScanDate")
-        }
 
         let scanDesc = FetchDescriptor<SkinScanRecord>(sortBy: [SortDescriptor(\SkinScanRecord.date, order: .reverse)])
-        if let latest = try? modelContext.fetch(scanDesc).first {
-            shared?.set(Int(latest.textureEvennessScore.rounded()), forKey: "widgetTextureScore")
-            shared?.set(Int(latest.apparentHydrationScore.rounded()), forKey: "widgetHydrationScore")
-            shared?.set(Int(latest.brightnessRadianceScore.rounded()), forKey: "widgetRadianceScore")
-        }
+        let latest = try? modelContext.fetch(scanDesc).first
 
-        WidgetCenter.shared.reloadTimelines(ofKind: "SkinScoreWidget")
+        WidgetDataService.shared.writeAllData(
+            score: Int(targetScore),
+            trend: trendString,
+            lastScanDate: lastScanDate,
+            textureScore: Int(latest?.textureEvennessScore.rounded() ?? 0),
+            hydrationScore: Int(latest?.apparentHydrationScore.rounded() ?? 0),
+            radianceScore: Int(latest?.brightnessRadianceScore.rounded() ?? 0)
+        )
     }
 
     private func loadUserName(modelContext: ModelContext) {
