@@ -204,15 +204,58 @@ struct ContentView: View {
     )
 
     private var tabBarBackground: some View {
+        TabBarBackgroundView()
+    }
+}
+
+struct TabBarBackgroundView: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var tabBarHighlight: LinearGradient {
+        LinearGradient(
+            colors: [Color.white.opacity(colorScheme == .dark ? 0.06 : 0.15), Color.clear],
+            startPoint: .top,
+            endPoint: .center
+        )
+    }
+
+    private var tabBarChromeBorder: AngularGradient {
+        if colorScheme == .dark {
+            return AngularGradient(
+                colors: [
+                    Color.white.opacity(0.12),
+                    CelleuxColors.warmGold.opacity(0.18),
+                    Color.white.opacity(0.08),
+                    CelleuxColors.warmGold.opacity(0.12),
+                    Color.white.opacity(0.12)
+                ],
+                center: .center
+            )
+        }
+        return AngularGradient(
+            colors: [
+                CelleuxColors.silverLight.opacity(0.6),
+                CelleuxColors.warmGold.opacity(0.45),
+                Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.8),
+                CelleuxColors.silverBorder.opacity(0.5),
+                CelleuxColors.champagneGold.opacity(0.35),
+                Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.7),
+                CelleuxColors.silverLight.opacity(0.6)
+            ],
+            center: .center
+        )
+    }
+
+    var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.95))
+                .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.95))
 
             RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(Self.tabBarHighlight)
+                .fill(tabBarHighlight)
 
             RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .stroke(Self.tabBarChromeBorder, lineWidth: 1.5)
+                .stroke(tabBarChromeBorder, lineWidth: 1.5)
         }
         .celleuxDepthShadow()
     }

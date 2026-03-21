@@ -4,27 +4,31 @@ import SwiftData
 @main
 struct CelleuxApp: App {
     @State private var hasCompletedOnboarding: Bool = UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
+    @State private var appearanceManager = AppearanceManager.shared
 
     var body: some Scene {
         WindowGroup {
-            if hasCompletedOnboarding {
-                ContentView()
-                    .transition(.opacity)
-            } else {
-                OnboardingView()
-                    .environment(\.completeOnboarding, {
-                        withAnimation(.spring(response: 0.6, dampingFraction: 0.85)) {
-                            UserDefaults.standard.set(true, forKey: "hasCompletedOnboarding")
-                            hasCompletedOnboarding = true
-                        }
-                    })
-                    .environment(\.resetOnboarding, {
-                        withAnimation(.spring(response: 0.6, dampingFraction: 0.85)) {
-                            UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
-                            hasCompletedOnboarding = false
-                        }
-                    })
+            Group {
+                if hasCompletedOnboarding {
+                    ContentView()
+                        .transition(.opacity)
+                } else {
+                    OnboardingView()
+                        .environment(\.completeOnboarding, {
+                            withAnimation(.spring(response: 0.6, dampingFraction: 0.85)) {
+                                UserDefaults.standard.set(true, forKey: "hasCompletedOnboarding")
+                                hasCompletedOnboarding = true
+                            }
+                        })
+                        .environment(\.resetOnboarding, {
+                            withAnimation(.spring(response: 0.6, dampingFraction: 0.85)) {
+                                UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
+                                hasCompletedOnboarding = false
+                            }
+                        })
+                }
             }
+            .preferredColorScheme(appearanceManager.colorScheme)
         }
         .modelContainer(for: [
             UserProfile.self,
