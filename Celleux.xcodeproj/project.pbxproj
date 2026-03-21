@@ -73,10 +73,23 @@
 		};
 		AA1000022E9EAD3200EA8BCF /* CelleuxWidget */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				AA1000102E9EAD3200EA8BCF /* Exceptions for "CelleuxWidget" folder in "CelleuxWidgetExtension" target */,
+			);
 			path = CelleuxWidget;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		AA1000102E9EAD3200EA8BCF /* Exceptions for "CelleuxWidget" folder in "CelleuxWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = AA1000062E9EAD3200EA8BCF /* CelleuxWidgetExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		105FC5772E9EAD3100EA8BCF /* Frameworks */ = {
