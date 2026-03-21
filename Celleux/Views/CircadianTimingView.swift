@@ -365,7 +365,7 @@ struct CircadianTimingView: View {
                         .allowsHitTesting(false)
                 }
             }
-            .sensoryFeedback(.notification(.success), trigger: milestoneCelebration)
+            .sensoryFeedback(.success, trigger: milestoneCelebration)
             .staggeredAppear(appeared: appeared, delay: 0.04)
         }
     }

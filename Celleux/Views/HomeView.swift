@@ -1070,7 +1070,7 @@ struct HomeView: View {
             achievementCard
             nextAchievementCard
         }
-        .sensoryFeedback(.notification(.success), trigger: achievementCelebration)
+        .sensoryFeedback(.success, trigger: achievementCelebration)
         .staggeredAppear(appeared: appeared, delay: 0.32)
     }
 
