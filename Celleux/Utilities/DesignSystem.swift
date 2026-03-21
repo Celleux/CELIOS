@@ -860,7 +860,7 @@ struct OutlineGlassButtonStyle: ButtonStyle {
                         .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.92))
 
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(colorScheme == .dark ? Color.white.opacity(0.12) : CelleuxColors.glassEdgeHighlight, lineWidth: 1)
+                        .stroke(colorScheme == .dark ? AnyShapeStyle(Color.white.opacity(0.12)) : AnyShapeStyle(CelleuxColors.glassEdgeHighlight), lineWidth: 1)
                 }
             )
             .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 3)
@@ -1120,7 +1120,7 @@ struct ChromeIconBadge: View {
                 .frame(width: size, height: size)
 
             Circle()
-                .stroke(colorScheme == .dark ? Color.white.opacity(0.08) : CelleuxColors.iconHighlightGradient, lineWidth: 1.5)
+                .stroke(colorScheme == .dark ? AnyShapeStyle(Color.white.opacity(0.08)) : AnyShapeStyle(CelleuxColors.iconHighlightGradient), lineWidth: 1.5)
                 .frame(width: size, height: size)
 
             Image(systemName: systemName)
@@ -1171,7 +1171,7 @@ struct GlowingAccentBadge: View {
                 .frame(width: size, height: size)
 
             Circle()
-                .stroke(colorScheme == .dark ? Color.white.opacity(0.08) : CelleuxColors.iconHighlightGradient, lineWidth: 1.5)
+                .stroke(colorScheme == .dark ? AnyShapeStyle(Color.white.opacity(0.08)) : AnyShapeStyle(CelleuxColors.iconHighlightGradient), lineWidth: 1.5)
                 .frame(width: size, height: size)
 
             Image(systemName: systemName)
