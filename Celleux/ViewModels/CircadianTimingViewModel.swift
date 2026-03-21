@@ -11,6 +11,7 @@ struct ScheduleItem: Identifiable, Sendable {
     let category: String
     var isCompleted: Bool
     var isMissed: Bool
+    let icon: String
 
     var isActive: Bool {
         let now = Date()
@@ -22,6 +23,10 @@ struct ScheduleItem: Identifiable, Sendable {
         let formatter = DateFormatter()
         formatter.dateFormat = "h:mm a"
         return formatter.string(from: time)
+    }
+
+    var isUpcoming: Bool {
+        !isCompleted && !isMissed && time > Date()
     }
 }
 
@@ -43,6 +48,42 @@ final class CircadianTimingViewModel {
     var workoutTime: Date = Calendar.current.date(from: DateComponents(hour: 17, minute: 0)) ?? Date()
     var autoAdjust: Bool = true
     var expandedScienceCards: Set<String> = []
+    var workoutDetectedToday: Bool = false
+    var lastWorkoutEndTime: Date? = nil
+    var isWeekendMode: Bool = false
+    var weekendModeEnabled: Bool = UserDefaults.standard.bool(forKey: "weekendModeEnabled")
+    var weekendExtraMinutes: Int = UserDefaults.standard.integer(forKey: "weekendExtraMinutes") == 0 ? 60 : UserDefaults.standard.integer(forKey: "weekendExtraMinutes")
+
+    var nextDoseCountdown: String? {
+        let now = Date()
+        guard let nextItem = scheduleItems.first(where: { $0.isUpcoming }) else { return nil }
+        let diff = nextItem.time.timeIntervalSince(now)
+        guard diff > 0 else { return nil }
+        let hours = Int(diff) / 3600
+        let minutes = (Int(diff) % 3600) / 60
+        if hours > 0 {
+            return "In \(hours)h \(minutes)m"
+        } else {
+            return "In \(minutes)m"
+        }
+    }
+
+    var nextDoseItem: ScheduleItem? {
+        scheduleItems.first(where: { $0.isUpcoming })
+    }
+
+    var currentTimeProgress: Double {
+        let calendar = Calendar.current
+        let wakeComps = calendar.dateComponents([.hour, .minute], from: wakeTime)
+        let sleepComps = calendar.dateComponents([.hour, .minute], from: sleepTime)
+        let wakeMinutes = Double((wakeComps.hour ?? 7) * 60 + (wakeComps.minute ?? 0))
+        let sleepMinutes = Double((sleepComps.hour ?? 23) * 60 + (sleepComps.minute ?? 0))
+        let nowComps = calendar.dateComponents([.hour, .minute], from: Date())
+        let nowMinutes = Double((nowComps.hour ?? 12) * 60 + (nowComps.minute ?? 0))
+        let totalWindow = sleepMinutes - wakeMinutes
+        guard totalWindow > 0 else { return 0.5 }
+        return min(1, max(0, (nowMinutes - wakeMinutes) / totalWindow))
+    }
 
     let scienceCards: [TimingScienceCard] = [
         TimingScienceCard(
@@ -70,6 +111,11 @@ final class CircadianTimingViewModel {
         scheduleItems.count
     }
 
+    var completionProgress: Double {
+        guard totalCount > 0 else { return 0 }
+        return Double(completedCount) / Double(totalCount)
+    }
+
     func loadSchedule(modelContext: ModelContext) async {
         isLoading = true
 
@@ -82,8 +128,11 @@ final class CircadianTimingViewModel {
             applyHealthKitSchedule()
         }
 
-        loadTodayCompletions(modelContext: modelContext)
+        await detectWorkout()
+        checkWeekendMode()
+        await applyAdaptiveAdjustments(modelContext: modelContext)
         generateSchedule()
+        loadTodayCompletions(modelContext: modelContext)
 
         isLoading = false
     }
@@ -105,80 +154,129 @@ final class CircadianTimingViewModel {
         }
     }
 
+    private func detectWorkout() async {
+        let workouts = await healthService.queryTodayWorkouts()
+        workoutDetectedToday = !workouts.isEmpty
+        lastWorkoutEndTime = workouts.first?.endTime
+    }
+
+    private func checkWeekendMode() {
+        let calendar = Calendar.current
+        let weekday = calendar.component(.weekday, from: Date())
+        let isWeekend = weekday == 1 || weekday == 7
+        isWeekendMode = isWeekend && weekendModeEnabled
+    }
+
+    private func applyAdaptiveAdjustments(modelContext: ModelContext) async {
+        let calendar = Calendar.current
+        let sevenDaysAgo = calendar.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+
+        let predicate = #Predicate<DoseCompletionPattern> { pattern in
+            pattern.category == "morning" && pattern.date >= sevenDaysAgo
+        }
+        let descriptor = FetchDescriptor<DoseCompletionPattern>(predicate: predicate)
+        guard let patterns = try? modelContext.fetch(descriptor), patterns.count >= 3 else { return }
+
+        let avgDelay = patterns.map(\.delayMinutes).reduce(0, +) / patterns.count
+        if avgDelay > 45 {
+            let adjustMinutes = 15
+            wakeTime = calendar.date(byAdding: .minute, value: adjustMinutes, to: wakeTime) ?? wakeTime
+        }
+    }
+
     private func generateSchedule() {
         let calendar = Calendar.current
         let wakeComps = calendar.dateComponents([.hour, .minute], from: wakeTime)
         let sleepComps = calendar.dateComponents([.hour, .minute], from: sleepTime)
-        let workoutComps = calendar.dateComponents([.hour, .minute], from: workoutTime)
 
         let today = calendar.startOfDay(for: Date())
+        let wakeH = wakeComps.hour ?? 7
+        let wakeM = wakeComps.minute ?? 0
+
+        let weekendOffset = isWeekendMode ? weekendExtraMinutes : 0
 
         let morningTime = calendar.date(byAdding: DateComponents(
-            hour: (wakeComps.hour ?? 7),
-            minute: (wakeComps.minute ?? 0) + 30
+            hour: wakeH,
+            minute: wakeM + 30 + weekendOffset
         ), to: today) ?? today
 
         let middayTime = calendar.date(byAdding: DateComponents(
-            hour: 12, minute: 30
+            hour: wakeH + 6,
+            minute: wakeM + weekendOffset
         ), to: today) ?? today
 
-        let postWorkoutTime = calendar.date(byAdding: DateComponents(
-            hour: (workoutComps.hour ?? 17),
-            minute: (workoutComps.minute ?? 0) + 15
-        ), to: today) ?? today
+        let postWorkoutTime: Date
+        let postWorkoutLabel: String
+        let postWorkoutIcon: String
+        let postWorkoutRationale: String
 
-        let eveningTime: Date
+        if workoutDetectedToday, let endTime = lastWorkoutEndTime {
+            postWorkoutTime = endTime.addingTimeInterval(30 * 60)
+            postWorkoutLabel = "Post-Workout Recovery"
+            postWorkoutIcon = "figure.run"
+            postWorkoutRationale = "Workout detected — antioxidants are most protective 30 minutes post-exercise when oxidative stress peaks."
+        } else {
+            postWorkoutTime = calendar.date(byAdding: DateComponents(
+                hour: wakeH + 9,
+                minute: wakeM + weekendOffset
+            ), to: today) ?? today
+            postWorkoutLabel = "Afternoon Antioxidants"
+            postWorkoutIcon = "sun.haze"
+            postWorkoutRationale = "No workout detected today. Afternoon antioxidant dose supports skin protection during peak UV hours."
+        }
+
         let sleepH = sleepComps.hour ?? 23
         let sleepM = sleepComps.minute ?? 0
-        let eveningMinutes = max(0, (sleepH * 60 + sleepM) - 90)
-        eveningTime = calendar.date(byAdding: DateComponents(
+        let eveningMinutes = max(0, (sleepH * 60 + sleepM) - 120)
+        let eveningTime = calendar.date(byAdding: DateComponents(
             hour: eveningMinutes / 60,
             minute: eveningMinutes % 60
         ), to: today) ?? today
 
         let now = Date()
 
-        var items: [ScheduleItem] = []
-
-        items.append(ScheduleItem(
-            time: morningTime,
-            label: "Morning Dose",
-            supplements: ["Vitamin C (1000mg)", "Vitamin D3 (5000 IU)", "Adaptogen blend"],
-            rationale: "Taken 30 min after waking to align with cortisol peak. Vitamin D absorption is highest in the morning with food.",
-            category: "morning",
-            isCompleted: false,
-            isMissed: !items.isEmpty ? false : (now > morningTime.addingTimeInterval(3600) && !false)
-        ))
-
-        items.append(ScheduleItem(
-            time: middayTime,
-            label: "Midday Hydration",
-            supplements: ["Hyaluronic acid (200mg)", "Zinc (15mg)"],
-            rationale: "Midday dosing supports sustained hydration levels. Zinc absorption is optimized away from morning calcium.",
-            category: "midday",
-            isCompleted: false,
-            isMissed: false
-        ))
-
-        items.append(ScheduleItem(
-            time: postWorkoutTime,
-            label: "Post-Activity Antioxidants",
-            supplements: ["Astaxanthin (12mg)", "CoQ10 (200mg)", "Omega-3 (2000mg)"],
-            rationale: "Post-exercise oxidative stress creates a window where antioxidants are most protective for skin cells.",
-            category: "postworkout",
-            isCompleted: false,
-            isMissed: false
-        ))
-
-        items.append(ScheduleItem(
-            time: eveningTime,
-            label: "Evening Repair",
-            supplements: ["Collagen peptides (10g)", "Magnesium glycinate (400mg)"],
-            rationale: "Collagen synthesis peaks during sleep. Magnesium supports GABA activity for deep sleep, enhancing overnight cellular repair.",
-            category: "evening",
-            isCompleted: false,
-            isMissed: false
-        ))
+        var items: [ScheduleItem] = [
+            ScheduleItem(
+                time: morningTime,
+                label: "Morning Dose",
+                supplements: ["Vitamin C (1000mg)", "Vitamin D3 (5000 IU)", "Adaptogen blend"],
+                rationale: "Taken 30 min after waking to align with cortisol peak. Vitamin D absorption is highest in the morning with food.",
+                category: "morning",
+                isCompleted: false,
+                isMissed: false,
+                icon: "sunrise.fill"
+            ),
+            ScheduleItem(
+                time: middayTime,
+                label: "Midday Hydration",
+                supplements: ["Hyaluronic acid (200mg)", "Zinc (15mg)"],
+                rationale: "Midday dosing supports sustained hydration levels. Zinc absorption is optimized away from morning calcium.",
+                category: "midday",
+                isCompleted: false,
+                isMissed: false,
+                icon: "sun.max.fill"
+            ),
+            ScheduleItem(
+                time: postWorkoutTime,
+                label: postWorkoutLabel,
+                supplements: ["Astaxanthin (12mg)", "CoQ10 (200mg)", "Omega-3 (2000mg)"],
+                rationale: postWorkoutRationale,
+                category: "postworkout",
+                isCompleted: false,
+                isMissed: false,
+                icon: postWorkoutIcon
+            ),
+            ScheduleItem(
+                time: eveningTime,
+                label: "Evening Repair",
+                supplements: ["Collagen peptides (10g)", "Magnesium glycinate (400mg)"],
+                rationale: "Collagen synthesis peaks during sleep. Magnesium supports GABA activity for deep sleep, enhancing overnight cellular repair.",
+                category: "evening",
+                isCompleted: false,
+                isMissed: false,
+                icon: "moon.stars.fill"
+            )
+        ]
 
         for i in items.indices {
             if now > items[i].time.addingTimeInterval(3600) && !items[i].isCompleted {
@@ -229,6 +327,7 @@ final class CircadianTimingViewModel {
             )
             modelContext.insert(dose)
 
+            recordCompletionPattern(item: item, modelContext: modelContext)
             updateAdherenceStreak(modelContext: modelContext)
         } else {
             let category = item.category
@@ -244,6 +343,25 @@ final class CircadianTimingViewModel {
         }
 
         try? modelContext.save()
+    }
+
+    private func recordCompletionPattern(item: ScheduleItem, modelContext: ModelContext) {
+        let calendar = Calendar.current
+        let scheduledComps = calendar.dateComponents([.hour, .minute], from: item.time)
+        let nowComps = calendar.dateComponents([.hour, .minute], from: Date())
+
+        let scheduledMinute = (scheduledComps.hour ?? 0) * 60 + (scheduledComps.minute ?? 0)
+        let actualMinute = (nowComps.hour ?? 0) * 60 + (nowComps.minute ?? 0)
+        let delay = max(0, actualMinute - scheduledMinute)
+
+        let pattern = DoseCompletionPattern(
+            category: item.category,
+            scheduledMinuteOfDay: scheduledMinute,
+            actualMinuteOfDay: actualMinute,
+            date: Date(),
+            delayMinutes: delay
+        )
+        modelContext.insert(pattern)
     }
 
     private func updateAdherenceStreak(modelContext: ModelContext) {
@@ -298,6 +416,22 @@ final class CircadianTimingViewModel {
                     trigger: trigger
                 )
                 try? await center.add(request)
+
+                let reminderContent = UNMutableNotificationContent()
+                reminderContent.title = "Gentle Reminder"
+                reminderContent.body = "Your \(item.label.lowercased()) is waiting — \(item.supplements.first ?? "supplements") ready to go."
+                reminderContent.sound = .default
+
+                let reminderTime = item.time.addingTimeInterval(30 * 60)
+                let reminderComps = calendar.dateComponents([.hour, .minute], from: reminderTime)
+                let reminderTrigger = UNCalendarNotificationTrigger(dateMatching: reminderComps, repeats: true)
+
+                let reminderRequest = UNNotificationRequest(
+                    identifier: "\(item.category)_reminder",
+                    content: reminderContent,
+                    trigger: reminderTrigger
+                )
+                try? await center.add(reminderRequest)
             }
         }
     }
@@ -305,5 +439,31 @@ final class CircadianTimingViewModel {
     func regenerateSchedule() {
         generateSchedule()
         scheduleNotifications()
+    }
+
+    func toggleWeekendMode() {
+        weekendModeEnabled.toggle()
+        UserDefaults.standard.set(weekendModeEnabled, forKey: "weekendModeEnabled")
+        checkWeekendMode()
+        generateSchedule()
+        scheduleNotifications()
+    }
+
+    func doseWindowSegments() -> [(start: Double, end: Double, category: String)] {
+        let calendar = Calendar.current
+        let wakeComps = calendar.dateComponents([.hour, .minute], from: wakeTime)
+        let sleepComps = calendar.dateComponents([.hour, .minute], from: sleepTime)
+        let wakeMinutes = Double((wakeComps.hour ?? 7) * 60 + (wakeComps.minute ?? 0))
+        let sleepMinutes = Double((sleepComps.hour ?? 23) * 60 + (sleepComps.minute ?? 0))
+        let totalWindow = sleepMinutes - wakeMinutes
+        guard totalWindow > 0 else { return [] }
+
+        return scheduleItems.map { item in
+            let itemComps = calendar.dateComponents([.hour, .minute], from: item.time)
+            let itemMinutes = Double((itemComps.hour ?? 0) * 60 + (itemComps.minute ?? 0))
+            let center = (itemMinutes - wakeMinutes) / totalWindow
+            let halfWidth = 0.06
+            return (start: max(0, center - halfWidth), end: min(1, center + halfWidth), category: item.category)
+        }
     }
 }

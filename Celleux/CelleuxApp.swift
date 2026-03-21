@@ -34,6 +34,7 @@ struct CelleuxApp: App {
             DailyCheckIn.self,
             AchievementRecord.self,
             CalibrationBaseline.self,
+            DoseCompletionPattern.self,
         ])
     }
 }

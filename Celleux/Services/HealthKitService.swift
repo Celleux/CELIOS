@@ -28,6 +28,12 @@ nonisolated struct MoodEntry: Sendable {
     let associations: [Int]
 }
 
+nonisolated struct WorkoutInfo: Sendable {
+    let endTime: Date
+    let durationMinutes: Double
+    let activityType: UInt
+}
+
 @Observable
 final class HealthKitService {
     static let shared = HealthKitService()
@@ -82,6 +88,7 @@ final class HealthKitService {
             HKQuantityType(.appleExerciseTime),
             HKCategoryType(.sleepAnalysis),
             HKSampleType.stateOfMindType(),
+            HKObjectType.workoutType(),
         ]
 
         let shareTypes: Set<HKSampleType> = [
@@ -404,6 +411,38 @@ final class HealthKitService {
             sleepHour: avgSleepH,
             sleepMinute: avgSleepM
         )
+    }
+
+    func queryTodayWorkouts() async -> [WorkoutInfo] {
+        guard isAvailable else { return [] }
+
+        let workoutType = HKObjectType.workoutType()
+        let startOfDay = Calendar.current.startOfDay(for: Date())
+        let predicate = HKQuery.predicateForSamples(withStart: startOfDay, end: Date(), options: .strictStartDate)
+
+        return await withCheckedContinuation { continuation in
+            let sort = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
+            let query = HKSampleQuery(
+                sampleType: workoutType,
+                predicate: predicate,
+                limit: 10,
+                sortDescriptors: [sort]
+            ) { _, samples, _ in
+                guard let workouts = samples as? [HKWorkout] else {
+                    continuation.resume(returning: [])
+                    return
+                }
+                let infos = workouts.map { w in
+                    WorkoutInfo(
+                        endTime: w.endDate,
+                        durationMinutes: w.duration / 60.0,
+                        activityType: w.workoutActivityType.rawValue
+                    )
+                }
+                continuation.resume(returning: infos)
+            }
+            store.execute(query)
+        }
     }
 
     private func fetchSleepSamples(from startDate: Date, to endDate: Date) async -> [SleepSampleInfo] {
