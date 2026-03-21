@@ -233,11 +233,23 @@ struct ProfileView: View {
 
     private var achievementsSection: some View {
         VStack(spacing: 12) {
-            SectionHeader(title: "Achievements")
+            HStack {
+                SectionHeader(title: "Achievements")
+                Spacer()
+                NavigationLink(destination: AchievementsView()) {
+                    HStack(spacing: 4) {
+                        Text("See All")
+                            .font(.system(size: 13, weight: .medium))
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .foregroundStyle(CelleuxColors.warmGold)
+                }
+            }
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 14) {
-                    ForEach(AchievementDefinition.allCases) { def in
+                    ForEach(AchievementDefinition.allCases.prefix(8)) { def in
                         let unlocked = unlockedAchievements.contains { $0.identifier == def.rawValue }
                         achievementBadge(def: def, unlocked: unlocked)
                     }

@@ -416,38 +416,9 @@ final class SkinScanViewModel {
         modelContext.insert(record)
         UserDefaults.standard.set(Int(analysis.overallScore.rounded()), forKey: "latestSkinScore")
 
-        checkAchievements(modelContext: modelContext)
+        AchievementEngine.shared.checkAll(modelContext: modelContext)
 
         try? modelContext.save()
-    }
-
-    private func checkAchievements(modelContext: ModelContext) {
-        let scanDescriptor = FetchDescriptor<SkinScanRecord>()
-        let scanCount = (try? modelContext.fetchCount(scanDescriptor)) ?? 0
-
-        if scanCount >= 1 {
-            unlockAchievement(.firstScan, modelContext: modelContext)
-        }
-        if scanCount >= 10 {
-            unlockAchievement(.skinScientist, modelContext: modelContext)
-        }
-    }
-
-    private func unlockAchievement(_ def: AchievementDefinition, modelContext: ModelContext) {
-        let id = def.rawValue
-        let predicate = #Predicate<AchievementRecord> { record in
-            record.identifier == id
-        }
-        let descriptor = FetchDescriptor<AchievementRecord>(predicate: predicate)
-
-        if let existing = try? modelContext.fetch(descriptor).first {
-            if existing.unlockedAt == nil {
-                existing.unlockedAt = Date()
-            }
-        } else {
-            let record = AchievementRecord(identifier: id, unlockedAt: Date())
-            modelContext.insert(record)
-        }
     }
 
     private func updateAnalysisText() {

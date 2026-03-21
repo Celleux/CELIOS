@@ -8,6 +8,7 @@ struct ContentView: View {
     @State private var ripplePhase: CGFloat = 0
     @State private var contentAppeared: Bool = false
     @State private var longPressTab: AppTab? = nil
+    @State private var achievementEngine = AchievementEngine.shared
     @Namespace private var tabNamespace
 
     var body: some View {
@@ -35,6 +36,14 @@ struct ContentView: View {
             .animation(CelleuxSpring.luxury.delay(0.05), value: contentAppeared)
 
             floatingTabBar
+
+            if achievementEngine.showingUnlock, let achievement = achievementEngine.currentUnlock {
+                AchievementUnlockOverlay(achievement: achievement) {
+                    achievementEngine.dismissCurrent()
+                }
+                .transition(.opacity)
+                .zIndex(100)
+            }
         }
         .ignoresSafeArea(.keyboard)
         .sensoryFeedback(.selection, trigger: selectedTab)

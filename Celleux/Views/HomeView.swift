@@ -132,9 +132,7 @@ struct HomeView: View {
                     }
                 }
                 if viewModel.newAchievementUnlocked {
-                    withAnimation(CelleuxSpring.bouncy.delay(1.2)) {
-                        achievementCelebration = true
-                    }
+                    achievementCelebration = true
                     viewModel.newAchievementUnlocked = false
                 }
             }
