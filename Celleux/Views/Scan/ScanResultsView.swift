@@ -1022,11 +1022,11 @@ struct ScanComparisonSheet: View {
     ]
 
     private var primaryMetrics: [(index: Int, metric: SkinMetric)] {
-        Array(current.metrics.enumerated()).filter { Self.primaryMetricNames.contains($0.element.name) }
+        Array(current.metrics.enumerated()).filter { Self.primaryMetricNames.contains($0.element.name) }.map { (index: $0.offset, metric: $0.element) }
     }
 
     private var secondaryMetrics: [(index: Int, metric: SkinMetric)] {
-        Array(current.metrics.enumerated()).filter { !Self.primaryMetricNames.contains($0.element.name) }
+        Array(current.metrics.enumerated()).filter { !Self.primaryMetricNames.contains($0.element.name) }.map { (index: $0.offset, metric: $0.element) }
     }
 
     private var metricBars: some View {
