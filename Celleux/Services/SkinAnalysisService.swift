@@ -3,7 +3,7 @@ import CoreImage
 import Vision
 import Accelerate
 
-nonisolated class SkinAnalysisService: Sendable {
+nonisolated class SkinAnalysisService: @unchecked Sendable {
 
     func analyze(pixelBuffer: CVPixelBuffer, blendShapeElasticity: Double? = nil, lightingConditions: LightingConditions? = nil) async -> SkinAnalysisData? {
         let ciImage = CIImage(cvPixelBuffer: pixelBuffer)

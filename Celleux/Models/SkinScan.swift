@@ -87,7 +87,7 @@ nonisolated enum SkinMetricType: String, CaseIterable, Sendable {
     }
 }
 
-nonisolated enum SkinConcernType: String, CaseIterable, Sendable {
+enum SkinConcernType: String, CaseIterable, Sendable {
     case redness = "Redness"
     case texture = "Texture"
     case darkSpots = "Dark Spots"

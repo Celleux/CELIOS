@@ -595,7 +595,7 @@ struct GlassButtonStyle: ButtonStyle {
     }
 }
 
-nonisolated enum GlassButtonVariant {
+enum GlassButtonVariant {
     case primary
     case secondary
 
