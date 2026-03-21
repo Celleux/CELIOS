@@ -16,6 +16,7 @@ struct HomeView: View {
     @State private var breathingShadow: Bool = false
     @State private var overdueGlow: Bool = false
     @State private var selectedFactor: LongevityFactor? = nil
+    @State private var achievementCelebration: Bool = false
     @Namespace private var heroAnimation
 
     var body: some View {
@@ -28,6 +29,13 @@ struct HomeView: View {
 
                 ScrollView {
                     VStack(spacing: 32) {
+                        if viewModel.isRefreshing {
+                            GoldRefreshSpinner()
+                                .frame(maxWidth: .infinity)
+                                .padding(.top, 8)
+                                .transition(.opacity.combined(with: .scale(scale: 0.6)))
+                        }
+
                         greetingSection
                         if viewModel.hasData {
                             skinScoreHeroCard
@@ -39,10 +47,7 @@ struct HomeView: View {
                         healthSnapshotSection
                         quickActionsRow
                         weeklyTrendCard
-                        if viewModel.streakDays > 0 {
-                            streakCard
-                        }
-                        achievementCard
+                        streakAchievementSection
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
@@ -50,8 +55,9 @@ struct HomeView: View {
                 }
                 .scrollIndicators(.hidden)
                 .refreshable {
-                    viewModel.loadData(modelContext: modelContext)
+                    await viewModel.refreshAll(modelContext: modelContext)
                 }
+                .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.6), trigger: viewModel.refreshTrigger)
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -124,6 +130,12 @@ struct HomeView: View {
                     withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true).delay(0.5)) {
                         overdueGlow = true
                     }
+                }
+                if viewModel.newAchievementUnlocked {
+                    withAnimation(CelleuxSpring.bouncy.delay(1.2)) {
+                        achievementCelebration = true
+                    }
+                    viewModel.newAchievementUnlocked = false
                 }
             }
         }
@@ -1049,90 +1061,206 @@ struct HomeView: View {
         }
     }
 
-    private var streakCard: some View {
-        CompactGlassCard(cornerRadius: 24) {
-            HStack(spacing: 16) {
-                ZStack {
-                    Circle()
-                        .fill(RadialGradient(colors: [CelleuxColors.warmGold.opacity(0.15), CelleuxColors.warmGold.opacity(0.03)], center: .center, startRadius: 0, endRadius: 30))
-                        .frame(width: 56, height: 56)
-                    Circle()
-                        .stroke(AngularGradient(colors: [CelleuxColors.warmGold.opacity(0.6), CelleuxColors.warmGold.opacity(0.15), CelleuxColors.warmGold.opacity(0.45)], center: .center), lineWidth: 1)
-                        .frame(width: 56, height: 56)
-                    Image(systemName: "flame.fill")
-                        .font(.system(size: 22, weight: .light))
-                        .foregroundStyle(LinearGradient(colors: [CelleuxColors.roseGold, CelleuxColors.warmGold], startPoint: .top, endPoint: .bottom))
-                        .symbolEffect(.breathe, isActive: appeared)
-                }
-                .shadow(color: CelleuxColors.warmGold.opacity(0.2), radius: 10, x: 0, y: 4)
+    @ViewBuilder
+    private var streakAchievementSection: some View {
+        VStack(spacing: 16) {
+            if viewModel.streakDays > 0 {
+                streakCard
+            }
+            achievementCard
+            nextAchievementCard
+        }
+        .sensoryFeedback(.notification(.success), trigger: achievementCelebration)
+        .staggeredAppear(appeared: appeared, delay: 0.32)
+    }
 
-                VStack(alignment: .leading, spacing: 5) {
-                    HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        Text("\(viewModel.streakDays)")
-                            .font(.system(size: 32, weight: .bold))
-                            .foregroundStyle(CelleuxColors.goldGradient)
-                            .contentTransition(.numericText())
-                        Text("day streak")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(CelleuxColors.textPrimary)
+    private var streakCard: some View {
+        GlassCard(depth: .elevated) {
+            VStack(spacing: 16) {
+                HStack(spacing: 16) {
+                    ZStack {
+                        Circle()
+                            .fill(RadialGradient(colors: [CelleuxColors.warmGold.opacity(0.15), CelleuxColors.warmGold.opacity(0.03)], center: .center, startRadius: 0, endRadius: 30))
+                            .frame(width: 56, height: 56)
+                        Circle()
+                            .stroke(AngularGradient(colors: [CelleuxColors.warmGold.opacity(0.6), CelleuxColors.warmGold.opacity(0.15), CelleuxColors.warmGold.opacity(0.45)], center: .center), lineWidth: 1)
+                            .frame(width: 56, height: 56)
+                        Image(systemName: "flame.fill")
+                            .font(.system(size: 22, weight: .light))
+                            .foregroundStyle(LinearGradient(colors: [CelleuxColors.roseGold, CelleuxColors.warmGold], startPoint: .top, endPoint: .bottom))
+                            .symbolEffect(.breathe, isActive: appeared)
                     }
-                    Text("Consistency is the real anti-aging secret")
-                        .font(.system(size: 12, weight: .regular))
-                        .foregroundStyle(CelleuxColors.textLabel)
-                        .lineSpacing(4)
+                    .shadow(color: CelleuxColors.warmGold.opacity(0.2), radius: 10, x: 0, y: 4)
+
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack(alignment: .firstTextBaseline, spacing: 4) {
+                            Text("\(viewModel.streakDays)")
+                                .font(.system(size: 32, weight: .bold))
+                                .foregroundStyle(CelleuxColors.goldGradient)
+                                .contentTransition(.numericText())
+                            Text("day streak")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(CelleuxColors.textPrimary)
+                        }
+                        Text("Consistency is the real anti-aging secret")
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundStyle(CelleuxColors.textLabel)
+                            .lineSpacing(4)
+                    }
+                    Spacer()
                 }
-                Spacer()
+
+                streakMilestoneBar
             }
         }
-        .staggeredAppear(appeared: appeared, delay: 0.32)
+    }
+
+    private var streakMilestoneBar: some View {
+        let milestone = viewModel.streakMilestone
+        return VStack(spacing: 8) {
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(CelleuxColors.silver.opacity(0.1))
+                        .frame(height: 6)
+
+                    Capsule()
+                        .fill(CelleuxColors.goldGradient)
+                        .frame(width: geo.size.width * milestone.progress, height: 6)
+                        .shadow(color: CelleuxColors.warmGold.opacity(0.4), radius: 4, x: 0, y: 0)
+                        .animation(CelleuxSpring.luxury, value: milestone.progress)
+                }
+            }
+            .frame(height: 6)
+
+            HStack {
+                Text("\(milestone.daysRemaining) days to \(milestone.next)-day milestone")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(CelleuxColors.textLabel)
+                Spacer()
+                Text("\(Int(milestone.progress * 100))%")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(CelleuxColors.warmGold)
+                    .contentTransition(.numericText())
+            }
+        }
     }
 
     @ViewBuilder
     private var achievementCard: some View {
         if let achievement = viewModel.latestAchievement {
+            ZStack {
+                HStack(spacing: 14) {
+                    ZStack {
+                        Circle()
+                            .fill(RadialGradient(colors: [CelleuxColors.warmGold.opacity(0.12), CelleuxColors.warmGold.opacity(0.02)], center: .center, startRadius: 0, endRadius: 26))
+                            .frame(width: 50, height: 50)
+                        Circle()
+                            .stroke(AngularGradient(colors: [CelleuxColors.warmGold.opacity(0.5), CelleuxColors.warmGold.opacity(0.15), CelleuxColors.roseGold.opacity(0.4)], center: .center), lineWidth: 1)
+                            .frame(width: 50, height: 50)
+                        Image(systemName: achievement.icon)
+                            .font(.system(size: 20, weight: .light))
+                            .foregroundStyle(LinearGradient(colors: [CelleuxColors.roseGold, CelleuxColors.warmGold], startPoint: .topLeading, endPoint: .bottomTrailing))
+                            .symbolEffect(.bounce, value: achievementCelebration)
+                    }
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("LATEST ACHIEVEMENT")
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .foregroundStyle(CelleuxColors.warmGold)
+                            .tracking(0.8)
+                            .textCase(.uppercase)
+                        Text(achievement.title)
+                            .font(.system(size: 18, weight: .medium))
+                            .tracking(0.3)
+                            .foregroundStyle(CelleuxColors.textPrimary)
+                        Text(achievement.subtitle)
+                            .font(.system(size: 11, weight: .regular))
+                            .foregroundStyle(CelleuxColors.textLabel)
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                }
+                .padding(18)
+                .background(
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .fill(Color.white.opacity(0.92))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .stroke(CelleuxColors.glassEdgeHighlight, lineWidth: 1)
+                )
+                .celleuxDepthShadow()
+
+                if achievementCelebration {
+                    CelebrationParticleBurst(isActive: achievementCelebration)
+                        .allowsHitTesting(false)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var nextAchievementCard: some View {
+        if let next = viewModel.nextAchievement {
             HStack(spacing: 14) {
                 ZStack {
                     Circle()
-                        .fill(RadialGradient(colors: [CelleuxColors.warmGold.opacity(0.12), CelleuxColors.warmGold.opacity(0.02)], center: .center, startRadius: 0, endRadius: 26))
-                        .frame(width: 50, height: 50)
+                        .fill(CelleuxColors.silver.opacity(0.06))
+                        .frame(width: 46, height: 46)
                     Circle()
-                        .stroke(AngularGradient(colors: [CelleuxColors.warmGold.opacity(0.5), CelleuxColors.warmGold.opacity(0.15), CelleuxColors.roseGold.opacity(0.4)], center: .center), lineWidth: 1)
-                        .frame(width: 50, height: 50)
-                    Image(systemName: achievement.icon)
-                        .font(.system(size: 20, weight: .light))
-                        .foregroundStyle(LinearGradient(colors: [CelleuxColors.roseGold, CelleuxColors.warmGold], startPoint: .topLeading, endPoint: .bottomTrailing))
-                        .symbolEffect(.bounce, value: appeared)
+                        .stroke(CelleuxColors.silver.opacity(0.15), lineWidth: 1)
+                        .frame(width: 46, height: 46)
+
+                    Circle()
+                        .trim(from: 0, to: next.progress)
+                        .stroke(
+                            LinearGradient(colors: [CelleuxColors.warmGold.opacity(0.6), CelleuxColors.warmGold], startPoint: .topLeading, endPoint: .trailing),
+                            style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
+                        )
+                        .frame(width: 46, height: 46)
+                        .rotationEffect(.degrees(-90))
+                        .animation(CelleuxSpring.luxury, value: next.progress)
+
+                    Image(systemName: next.icon)
+                        .font(.system(size: 17, weight: .light))
+                        .foregroundStyle(CelleuxColors.silver.opacity(0.6))
                 }
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("LATEST ACHIEVEMENT")
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(CelleuxColors.warmGold)
+                    Text("NEXT ACHIEVEMENT")
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .foregroundStyle(CelleuxColors.textLabel)
                         .tracking(0.8)
-                        .textCase(.uppercase)
-                    Text(achievement.title)
-                        .font(.system(size: 18, weight: .medium))
+
+                    Text(next.title)
+                        .font(.system(size: 15, weight: .medium))
                         .tracking(0.3)
                         .foregroundStyle(CelleuxColors.textPrimary)
-                    Text(achievement.subtitle)
+
+                    Text(next.subtitle)
                         .font(.system(size: 11, weight: .regular))
                         .foregroundStyle(CelleuxColors.textLabel)
                         .lineLimit(1)
                 }
+
                 Spacer()
+
+                Text("\(Int(next.progress * 100))%")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(CelleuxColors.warmGold)
+                    .contentTransition(.numericText())
             }
-            .padding(18)
+            .padding(16)
             .background(
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(Color.white.opacity(0.92))
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color.white.opacity(0.88))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .stroke(CelleuxColors.glassEdgeHighlight, lineWidth: 1)
             )
-            .shadow(color: .black.opacity(0.06), radius: 12, x: 0, y: 6)
-            .shadow(color: .black.opacity(0.03), radius: 30, x: 0, y: 15)
-            .staggeredAppear(appeared: appeared, delay: 0.38)
+            .celleuxDepthShadow()
         }
     }
 }

@@ -18,6 +18,10 @@ final class HomeViewModel {
     var uvIndex: Int = 4
     var uvLabel: String = "Moderate"
     var latestAchievement: Achievement? = nil
+    var nextAchievement: NextAchievementInfo? = nil
+    var newAchievementUnlocked: Bool = false
+    var isRefreshing: Bool = false
+    var refreshTrigger: Bool = false
 
     var sleepScore: Double = 0
     var hrvScore: Double = 0
@@ -434,11 +438,17 @@ final class HomeViewModel {
         }
     }
 
+    var streakMilestone: StreakMilestone {
+        StreakMilestone.current(for: streakDays)
+    }
+
     private func loadStreak() {
         streakDays = UserDefaults.standard.integer(forKey: "adherenceStreak")
     }
 
     private func loadLatestAchievement(modelContext: ModelContext) {
+        checkAndUnlockAchievements(modelContext: modelContext)
+
         let predicate = #Predicate<AchievementRecord> { record in
             record.unlockedAt != nil
         }
@@ -450,6 +460,112 @@ final class HomeViewModel {
         } else {
             latestAchievement = nil
         }
+
+        loadNextAchievement(modelContext: modelContext)
+    }
+
+    private func checkAndUnlockAchievements(modelContext: ModelContext) {
+        let allRecords = (try? modelContext.fetch(FetchDescriptor<AchievementRecord>())) ?? []
+        let unlockedIds = Set(allRecords.filter { $0.isUnlocked }.map { $0.identifier })
+        let recordMap = Dictionary(uniqueKeysWithValues: allRecords.map { ($0.identifier, $0) })
+
+        let scanDescriptor = FetchDescriptor<SkinScanRecord>()
+        let totalScans = (try? modelContext.fetchCount(scanDescriptor)) ?? 0
+
+        var justUnlocked = false
+
+        for def in AchievementDefinition.allCases {
+            guard !unlockedIds.contains(def.rawValue) else { continue }
+            let met = isConditionMet(def, scanCount: totalScans)
+            guard met else { continue }
+
+            if let existing = recordMap[def.rawValue] {
+                existing.unlockedAt = Date()
+            } else {
+                let record = AchievementRecord(identifier: def.rawValue, unlockedAt: Date())
+                modelContext.insert(record)
+            }
+            justUnlocked = true
+        }
+
+        if justUnlocked {
+            try? modelContext.save()
+            newAchievementUnlocked = true
+        }
+    }
+
+    private func isConditionMet(_ def: AchievementDefinition, scanCount: Int) -> Bool {
+        switch def {
+        case .firstScan: scanCount >= 1
+        case .consistent: streakDays >= 7
+        case .committed: streakDays >= 30
+        case .dedicated: streakDays >= 90
+        case .skinScientist: scanCount >= 10
+        case .nightOwl: streakDays >= 7
+        case .earlyBird: streakDays >= 7
+        case .dataDriven: streakDays >= 30
+        case .verified: false
+        case .radiant: targetScore >= 80
+        case .topTenPercent: adherenceScore >= 90 && streakDays >= 30
+        }
+    }
+
+    private func loadNextAchievement(modelContext: ModelContext) {
+        let allRecords = (try? modelContext.fetch(FetchDescriptor<AchievementRecord>())) ?? []
+        let unlockedIds = Set(allRecords.filter { $0.isUnlocked }.map { $0.identifier })
+
+        let scanDescriptor = FetchDescriptor<SkinScanRecord>()
+        let totalScans = (try? modelContext.fetchCount(scanDescriptor)) ?? 0
+
+        let locked = AchievementDefinition.allCases.filter { !unlockedIds.contains($0.rawValue) && $0 != .verified }
+
+        var best: (def: AchievementDefinition, progress: Double)? = nil
+        for def in locked {
+            let progress = progressForAchievement(def, scanCount: totalScans)
+            if let current = best {
+                if progress > current.progress {
+                    best = (def, progress)
+                }
+            } else {
+                best = (def, progress)
+            }
+        }
+
+        if let best {
+            nextAchievement = NextAchievementInfo(
+                title: best.def.title,
+                subtitle: best.def.subtitle,
+                icon: best.def.icon,
+                progress: min(best.progress, 0.99)
+            )
+        } else {
+            nextAchievement = nil
+        }
+    }
+
+    private func progressForAchievement(_ def: AchievementDefinition, scanCount: Int) -> Double {
+        switch def {
+        case .firstScan: min(1.0, Double(scanCount) / 1.0)
+        case .consistent: min(1.0, Double(streakDays) / 7.0)
+        case .committed: min(1.0, Double(streakDays) / 30.0)
+        case .dedicated: min(1.0, Double(streakDays) / 90.0)
+        case .skinScientist: min(1.0, Double(scanCount) / 10.0)
+        case .nightOwl: min(1.0, Double(streakDays) / 7.0)
+        case .earlyBird: min(1.0, Double(streakDays) / 7.0)
+        case .dataDriven: min(1.0, Double(streakDays) / 30.0)
+        case .verified: 0
+        case .radiant: min(1.0, targetScore / 80.0)
+        case .topTenPercent: min(1.0, (adherenceScore / 90.0 + Double(min(streakDays, 30)) / 30.0) / 2.0)
+        }
+    }
+
+    func refreshAll(modelContext: ModelContext) async {
+        isRefreshing = true
+        refreshTrigger.toggle()
+        await healthService.fetchAllData()
+        loadData(modelContext: modelContext)
+        try? await Task.sleep(for: .milliseconds(600))
+        isRefreshing = false
     }
 
     func toggleProtocolItem(_ item: ProtocolItem, modelContext: ModelContext) {
@@ -532,4 +648,28 @@ struct Achievement: Identifiable {
     let title: String
     let subtitle: String
     let icon: String
+}
+
+struct NextAchievementInfo: Identifiable {
+    let id = UUID()
+    let title: String
+    let subtitle: String
+    let icon: String
+    let progress: Double
+}
+
+struct StreakMilestone {
+    let current: Int
+    let next: Int
+    let progress: Double
+    let daysRemaining: Int
+
+    static let milestones = [7, 14, 30, 60, 90, 180, 365]
+
+    static func current(for days: Int) -> StreakMilestone {
+        let next = milestones.first(where: { $0 > days }) ?? (milestones.last! + 1)
+        let prev = milestones.last(where: { $0 <= days }) ?? 0
+        let progress = next > prev ? Double(days - prev) / Double(next - prev) : 1.0
+        return StreakMilestone(current: days, next: next, progress: progress, daysRemaining: next - days)
+    }
 }

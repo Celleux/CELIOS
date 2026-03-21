@@ -1,38 +1,45 @@
-# Home Dashboard — Protocol, Health Snapshot & Weekly Trend
+# Streak & Achievements + Pull-to-Refresh Upgrade
 
-## Features
+## What's Changing
 
-### 4. Today's Protocol (Upgrade existing card)
-- Add a **next dose countdown timer** that shows time remaining until the next incomplete dose (e.g. "Next in 2h 14m")
-- Animated checkmarks use `.symbolEffect(.bounce)` on completion toggle
-- `.sensoryFeedback(.success)` fires when marking a dose complete
-- Real completion status pulled from SwiftData `SupplementDose` records (already wired)
-- Morning/Midday/Post-Workout/Evening doses from circadian schedule
+Upgrading the existing streak card and achievement card on the Home screen, and replacing the default pull-to-refresh with a custom gold-themed spinner with haptics.
 
-### 5. Health Snapshot (New section)
-- **3-card horizontal scroll** below the protocol card: **Sleep**, **HRV**, **Hydration**
-- Each card is a compact GlassCard showing:
-  - Icon + metric name header
-  - Real value from HealthKit (e.g. "7.2h", "42 ms", "1200 mL")
-  - A mini sparkline chart (tiny LineMark from Swift Charts) showing recent trend
-- If no Apple Watch / no data: show a single elegant empty state card with "Connect Apple Watch for deeper insights"
-- Never shows mock or fake data — only real HealthKit readings
+---
 
-### 6. Weekly Trend (Replace existing chart)
-- Replace the custom Path-based chart with **Swift Charts** `AreaMark` + `LineMark`
-- Gold gradient fill under the line with `.catmullRom` interpolation for smooth curves
-- Tap on a data point to highlight that day's score in an overlay annotation
-- If fewer than 7 data points, show available data with a subtle note
-- Time range stays at 7 days (matching existing behavior)
+### 7. Streak & Achievements
 
-## Design
-- All new sections use the existing Celleux design system: GlassCard, CompactGlassCard, CelleuxColors (gold, silver palette), CelleuxType, CelleuxSpring animations
-- Health snapshot cards use horizontal ScrollView with `.contentMargins(.horizontal, 16)`
-- Countdown timer text in warm gold with a pulsing dot indicator
-- Weekly chart uses gold gradient fill (`CelleuxColors.goldGradient` tones) with a selected-day annotation bubble
-- Staggered appear animations continue the existing sequence timing
-- Haptic feedback on all interactive elements
+**Streak Card (upgrade existing):**
+- Keep the current flame icon + day count with gold gradient
+- Add a progress bar toward the next milestone (7 → 14 → 30 → 60 → 90 → 180 → 365 days)
+- Show "X days to next milestone" label beneath the bar
+- Haptic feedback on streak display
 
-## Changes
-- **HomeView.swift** — Upgrade `todaysProtocolCard` with countdown timer + haptics; add new `healthSnapshotSection`; replace `weeklySnapshotCard` chart with Swift Charts implementation
-- **HomeViewModel.swift** — Add computed properties for next dose countdown, health snapshot data (sleep/HRV/hydration values + mini history), and selected day state for the weekly chart
+**Achievement Section (upgrade existing):**
+- Show the latest unlocked achievement (existing) with a celebration shimmer on new unlocks
+- Add "Next Achievement" card below: shows the closest locked achievement with a progress indicator
+- Progress computed from real SwiftData data (scan count, streak length, longevity score, etc.)
+- `.sensoryFeedback(.notification(.success))` triggers when a new achievement is detected during data load
+- Particle burst animation (using existing `CelebrationParticleBurst` if available) on new unlock detection
+
+**Achievement Checking Logic (in HomeViewModel):**
+- On each `loadData`, check all `AchievementDefinition` cases against real data
+- Auto-unlock achievements when conditions are met (e.g. streak ≥ 7 → unlock "Consistent")
+- Track if a new unlock happened during this load to trigger celebration
+
+---
+
+### 8. Pull-to-Refresh
+
+- Replace the default `.refreshable` with a custom implementation
+- Gold-themed spinning ring animation at the top of the scroll view
+- Ring uses the Celleux gold gradient, animates rotation while refreshing
+- On pull trigger: `.sensoryFeedback(.impact)` fires
+- Refreshes all HealthKit data + recalculates longevity scores + reloads SwiftData
+- Smooth fade-in/out of the spinner
+- Loading state tracked in HomeViewModel (`isRefreshing` flag)
+
+---
+
+### Files Modified
+- **HomeView.swift** — Upgraded streak card, achievement section, custom pull-to-refresh spinner
+- **HomeViewModel.swift** — Achievement checking logic, `isRefreshing` state, `nextAchievement` computed property, streak milestone computation
