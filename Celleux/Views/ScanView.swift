@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import ARKit
 import CoreImage
+import AVFoundation
 
 struct ScanView: View {
     @State private var viewModel = SkinScanViewModel()
@@ -18,6 +19,7 @@ struct ScanView: View {
     @State private var compareBeforeScan: SkinScanResult?
     @State private var compareAfterScan: SkinScanResult?
     @State private var showAgingSimulation: Bool = false
+    @State private var cameraPermissionDenied: Bool = false
 
     private let analysisMetricNames: [String] = [
         "Texture Evenness",
@@ -273,14 +275,48 @@ struct ScanView: View {
         ZStack {
             CelleuxMeshBackground()
 
-            VStack(spacing: 0) {
-                cameraContainer(isScanning: false, showHeatMap: false)
-                Spacer(minLength: 16)
-                preScanBottomPanel
-                    .padding(.bottom, 90)
+            if cameraPermissionDenied {
+                VStack {
+                    Spacer()
+                    ErrorStateView(
+                        type: .cameraPermissionDenied,
+                        action: {
+                            if let url = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(url)
+                            }
+                        },
+                        secondaryAction: nil,
+                        secondaryLabel: nil
+                    )
+                    .padding(.horizontal, 16)
+                    Spacer()
+                }
+            } else {
+                VStack(spacing: 0) {
+                    cameraContainer(isScanning: false, showHeatMap: false)
+                    Spacer(minLength: 16)
+                    preScanBottomPanel
+                        .padding(.bottom, 90)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 4)
+        }
+        .task {
+            await checkCameraPermission()
+        }
+    }
+
+    private func checkCameraPermission() async {
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        switch status {
+        case .denied, .restricted:
+            cameraPermissionDenied = true
+        case .notDetermined:
+            let granted = await AVCaptureDevice.requestAccess(for: .video)
+            cameraPermissionDenied = !granted
+        default:
+            cameraPermissionDenied = false
         }
     }
 
@@ -709,35 +745,48 @@ struct ScanView: View {
             }
 
             if let error = viewModel.scanError {
-                VStack(spacing: 16) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.system(size: 32, weight: .light))
-                        .foregroundStyle(CelleuxColors.warmGold)
-                    Text(error)
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(CelleuxColors.textSecondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 24)
-                }
-                .padding(20)
-                .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(.ultraThinMaterial)
-                )
-                .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                .onAppear {
-                    Task {
-                        try? await Task.sleep(for: .seconds(3))
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
-                            viewModel.scanError = nil
-                        }
-                    }
-                }
+                scanErrorOverlay(error)
             }
         }
         .shadow(color: showHeatMap ? Color(hex: "E8D6A8").opacity(0.1) : Color.black.opacity(0.04), radius: showHeatMap ? 20 : 1, x: 0, y: showHeatMap ? 0 : 1)
         .shadow(color: showHeatMap ? Color(hex: "D4C4A0").opacity(0.08) : CelleuxColors.goldGlow.opacity(0.15), radius: 16, x: 0, y: 6)
         .shadow(color: Color.black.opacity(0.1), radius: 24, x: 0, y: 12)
+    }
+
+    private func scanErrorOverlay(_ error: String) -> some View {
+        let errorType: ErrorStateType = {
+            let lower = error.lowercased()
+            if lower.contains("lighting") || lower.contains("dim") {
+                return .scanFailedLighting
+            } else if lower.contains("face") || lower.contains("centered") {
+                return .scanFailedNoFace
+            } else if lower.contains("still") || lower.contains("movement") {
+                return .scanFailedMovement
+            }
+            return .scanFailedGeneric(error)
+        }()
+
+        return ScanErrorBanner(
+            message: errorType.message,
+            icon: errorType.icon,
+            onDismiss: {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                    viewModel.scanError = nil
+                }
+            }
+        )
+        .padding(.horizontal, 12)
+        .padding(.bottom, 12)
+        .frame(maxHeight: .infinity, alignment: .bottom)
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+        .onAppear {
+            Task {
+                try? await Task.sleep(for: .seconds(4))
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
+                    viewModel.scanError = nil
+                }
+            }
+        }
     }
 
     private func simulatorPlaceholder(darkMode: Bool) -> some View {

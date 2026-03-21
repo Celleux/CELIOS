@@ -23,6 +23,7 @@ final class HomeViewModel {
     var newAchievementUnlocked: Bool = false
     var isRefreshing: Bool = false
     var refreshTrigger: Bool = false
+    var isInitialLoad: Bool = true
 
     var sleepScore: Double = 0
     var hrvScore: Double = 0
@@ -231,6 +232,7 @@ final class HomeViewModel {
         loadLongevityHistory(modelContext: modelContext)
         loadNarrativeInsight(modelContext: modelContext)
         updateWidgetData(modelContext: modelContext)
+        isInitialLoad = false
     }
 
     private func updateWidgetData(modelContext: ModelContext) {

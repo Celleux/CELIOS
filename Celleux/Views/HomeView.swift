@@ -40,18 +40,27 @@ struct HomeView: View {
                         }
 
                         greetingSection
-                        if viewModel.hasData {
-                            skinScoreHeroCard
+                        if viewModel.isInitialLoad {
+                            GoldSkeletonCard(style: .scoreHero)
+                                .transition(.opacity)
+                            GoldSkeletonCard(style: .protocolCard)
+                                .transition(.opacity)
+                            GoldSkeletonCard(style: .chartCard)
+                                .transition(.opacity)
                         } else {
-                            emptyScoreCard
+                            if viewModel.hasData {
+                                skinScoreHeroCard
+                            } else {
+                                emptyScoreCard
+                            }
+                            longevityCompositeCard
+                            todaysProtocolCard
+                            healthSnapshotSection
+                            quickActionsRow
+                            weeklyTrendCard
+                            streakAchievementSection
+                            challengeCard
                         }
-                        longevityCompositeCard
-                        todaysProtocolCard
-                        healthSnapshotSection
-                        quickActionsRow
-                        weeklyTrendCard
-                        streakAchievementSection
-                        challengeCard
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 8)

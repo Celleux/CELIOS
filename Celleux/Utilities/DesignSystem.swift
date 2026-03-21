@@ -1042,7 +1042,15 @@ struct ShimmerEffect: ViewModifier {
 
 struct SkeletonShimmerEffect: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var startPoint: UnitPoint = UnitPoint(x: -0.3, y: -0.3)
+    @State private var startPoint: UnitPoint = UnitPoint(x: -0.4, y: -0.4)
+
+    private static let shimmerColors: [Color] = [
+        .clear,
+        CelleuxColors.warmGold.opacity(0.12),
+        Color.white.opacity(0.22),
+        CelleuxColors.warmGold.opacity(0.12),
+        .clear
+    ]
 
     func body(content: Content) -> some View {
         content
@@ -1051,9 +1059,9 @@ struct SkeletonShimmerEffect: ViewModifier {
                 Group {
                     if !reduceMotion {
                         LinearGradient(
-                            colors: [.clear, Color.white.opacity(0.25), .clear],
+                            colors: Self.shimmerColors,
                             startPoint: startPoint,
-                            endPoint: UnitPoint(x: startPoint.x + 0.6, y: startPoint.y + 0.6)
+                            endPoint: UnitPoint(x: startPoint.x + 0.5, y: startPoint.y + 0.5)
                         )
                         .allowsHitTesting(false)
                     }
@@ -1062,8 +1070,8 @@ struct SkeletonShimmerEffect: ViewModifier {
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .onAppear {
                 guard !reduceMotion else { return }
-                withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: false)) {
-                    startPoint = UnitPoint(x: 1.3, y: 1.3)
+                withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: false)) {
+                    startPoint = UnitPoint(x: 1.4, y: 1.4)
                 }
             }
     }
