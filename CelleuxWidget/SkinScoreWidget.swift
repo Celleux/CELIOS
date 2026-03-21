@@ -43,6 +43,11 @@ nonisolated struct SkinScoreProvider: TimelineProvider {
     }
 }
 
+private let widgetGold = Color(red: 0.79, green: 0.66, blue: 0.43)
+private let widgetGoldLight = Color(red: 0.83, green: 0.77, blue: 0.63)
+private let widgetGoldDark = Color(red: 0.72, green: 0.59, blue: 0.42)
+private let widgetCream = Color(red: 0.96, green: 0.95, blue: 0.93)
+
 struct SkinScoreWidgetView: View {
     @Environment(\.widgetFamily) private var family
     let entry: SkinScoreEntry
@@ -64,9 +69,17 @@ struct SkinScoreWidgetView: View {
 
     private var trendArrow: String {
         switch entry.trend {
-        case "up": "\u{2191}"
-        case "down": "\u{2193}"
-        default: "\u{2192}"
+        case "up": return "\u{2191}"
+        case "down": return "\u{2193}"
+        default: return "\u{2192}"
+        }
+    }
+
+    private var trendWord: String {
+        switch entry.trend {
+        case "up": return "Improving"
+        case "down": return "Declining"
+        default: return "Steady"
         }
     }
 
@@ -77,10 +90,15 @@ struct SkinScoreWidgetView: View {
         if hours < 1 { return "Just now" }
         if hours < 24 { return "\(hours)h ago" }
         return "\(hours / 24)d ago"
-    }
+        }
 
     private var hasData: Bool {
         entry.score > 0
+    }
+
+    private var isStale: Bool {
+        guard let lastScan = entry.lastScanDate else { return true }
+        return Date().timeIntervalSince(lastScan) > 86400
     }
 
     // MARK: - Circular Lock Screen
@@ -89,23 +107,27 @@ struct SkinScoreWidgetView: View {
         Group {
             if hasData {
                 Gauge(value: Double(entry.score), in: 0...100) {
-                    Text("\(entry.score)")
-                        .font(.system(.body, design: .rounded, weight: .bold))
+                    Text("Skin")
                 } currentValueLabel: {
                     Text("\(entry.score)")
-                        .font(.system(.body, design: .rounded, weight: .bold))
+                        .font(.system(.title3, design: .rounded, weight: .bold))
                 }
                 .gaugeStyle(.accessoryCircular)
+                .tint(Gradient(colors: [widgetGoldLight, widgetGold]))
             } else {
-                VStack(spacing: 2) {
-                    Image(systemName: "face.smiling")
-                        .font(.title3)
-                    Text("Scan")
-                        .font(.caption2)
+                ZStack {
+                    AccessoryWidgetBackground()
+                    VStack(spacing: 1) {
+                        Image(systemName: "face.smiling")
+                            .font(.system(size: 18, weight: .light))
+                        Text("Scan")
+                            .font(.system(size: 9, weight: .medium))
+                    }
                 }
             }
         }
         .containerBackground(.fill.tertiary, for: .widget)
+        .widgetURL(URL(string: "celleux://scan"))
     }
 
     // MARK: - Rectangular Lock Screen
@@ -113,69 +135,192 @@ struct SkinScoreWidgetView: View {
     private var rectangularView: some View {
         Group {
             if hasData {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Skin Score")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                        HStack(spacing: 4) {
+                        HStack(spacing: 3) {
+                            Image(systemName: "sparkle")
+                                .font(.system(size: 8, weight: .semibold))
+                            Text("SKIN SCORE")
+                                .font(.system(size: 8, weight: .semibold))
+                                .tracking(0.8)
+                        }
+                        .foregroundStyle(.secondary)
+
+                        HStack(alignment: .firstTextBaseline, spacing: 4) {
                             Text("\(entry.score)")
-                                .font(.system(.title2, design: .rounded, weight: .bold))
+                                .font(.system(size: 26, design: .rounded, weight: .bold))
+
                             Text(trendArrow)
-                                .font(.caption)
+                                .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(.secondary)
                         }
                     }
+
                     Spacer()
-                    Text(timeSinceLastScan)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(trendWord)
+                            .font(.system(size: 10, weight: .medium))
+                        Text(timeSinceLastScan)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    }
                 }
             } else {
-                HStack {
+                HStack(spacing: 6) {
                     Image(systemName: "face.smiling")
-                    Text("Scan for your skin score")
-                        .font(.caption)
+                        .font(.system(size: 20, weight: .light))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("CELLEUX")
+                            .font(.system(size: 8, weight: .semibold))
+                            .tracking(1)
+                            .foregroundStyle(.secondary)
+                        Text("Scan for your score")
+                            .font(.system(size: 12, weight: .medium))
+                    }
                 }
             }
         }
         .containerBackground(.fill.tertiary, for: .widget)
+        .widgetURL(URL(string: "celleux://scan"))
     }
 
     // MARK: - Small Home Screen
 
     private var smallView: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 0) {
+            HStack {
+                Text("CELLEUX")
+                    .font(.system(size: 8, weight: .bold, design: .rounded))
+                    .tracking(1.5)
+                    .foregroundStyle(widgetGold.opacity(0.9))
+                Spacer()
+                if hasData && !isStale {
+                    Circle()
+                        .fill(widgetGold)
+                        .frame(width: 5, height: 5)
+                }
+            }
+            .padding(.bottom, 6)
+
+            Spacer()
+
             if hasData {
                 ZStack {
                     Circle()
-                        .stroke(Color(red: 0.91, green: 0.84, blue: 0.67).opacity(0.2), lineWidth: 6)
+                        .stroke(widgetGold.opacity(0.12), lineWidth: 5)
+                        .frame(width: 76, height: 76)
+
                     Circle()
                         .trim(from: 0, to: CGFloat(entry.score) / 100.0)
                         .stroke(
-                            Color(red: 0.91, green: 0.84, blue: 0.67),
-                            style: StrokeStyle(lineWidth: 6, lineCap: .round)
+                            LinearGradient(
+                                colors: [widgetGoldLight, widgetGold, widgetGoldDark],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            style: StrokeStyle(lineWidth: 5, lineCap: .round)
                         )
+                        .frame(width: 76, height: 76)
                         .rotationEffect(.degrees(-90))
-                    Text("\(entry.score)")
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
-                }
-                .frame(width: 72, height: 72)
 
-                Text("Skin Score")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [widgetGold.opacity(0.06), .clear],
+                                center: .center,
+                                startRadius: 0,
+                                endRadius: 38
+                            )
+                        )
+                        .frame(width: 76, height: 76)
+
+                    VStack(spacing: -1) {
+                        Text("\(entry.score)")
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundStyle(.primary)
+                        Text(trendArrow)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                VStack(spacing: 2) {
+                    Text("Skin Score")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.primary)
+
+                    if isStale {
+                        Text("Scan for latest")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(widgetGold.opacity(0.8))
+                    } else {
+                        Text(timeSinceLastScan)
+                            .font(.system(size: 9, weight: .regular))
+                            .foregroundStyle(.secondary)
+                    }
+                }
             } else {
-                Image(systemName: "face.smiling")
-                    .font(.largeTitle)
-                    .foregroundStyle(Color(red: 0.91, green: 0.84, blue: 0.67))
-                Text("Scan for\nyour score")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+                VStack(spacing: 8) {
+                    ZStack {
+                        Circle()
+                            .stroke(widgetGold.opacity(0.15), lineWidth: 5)
+                            .frame(width: 76, height: 76)
+
+                        Image(systemName: "face.smiling")
+                            .font(.system(size: 28, weight: .ultraLight))
+                            .foregroundStyle(widgetGold.opacity(0.6))
+                    }
+
+                    Text("Scan for\nyour score")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+
+                Spacer()
             }
         }
-        .containerBackground(.fill.tertiary, for: .widget)
+        .containerBackground(for: .widget) {
+            ZStack {
+                ContainerRelativeShape()
+                    .fill(Color(.systemBackground))
+
+                ContainerRelativeShape()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                widgetGold.opacity(0.04),
+                                Color.clear,
+                                widgetGold.opacity(0.02)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Circle()
+                            .fill(
+                                RadialGradient(
+                                    colors: [widgetGold.opacity(0.05), .clear],
+                                    center: .center,
+                                    startRadius: 0,
+                                    endRadius: 80
+                                )
+                            )
+                            .frame(width: 120, height: 120)
+                            .offset(x: 30, y: 30)
+                    }
+                }
+            }
+        }
+        .widgetURL(URL(string: "celleux://scan"))
     }
 
     // MARK: - Medium Home Screen
@@ -185,11 +330,15 @@ struct SkinScoreWidgetView: View {
             if hasData {
                 ZStack {
                     Circle()
-                        .stroke(Color(red: 0.91, green: 0.84, blue: 0.67).opacity(0.2), lineWidth: 6)
+                        .stroke(widgetGold.opacity(0.12), lineWidth: 6)
                     Circle()
                         .trim(from: 0, to: CGFloat(entry.score) / 100.0)
                         .stroke(
-                            Color(red: 0.91, green: 0.84, blue: 0.67),
+                            LinearGradient(
+                                colors: [widgetGoldLight, widgetGold, widgetGoldDark],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
                             style: StrokeStyle(lineWidth: 6, lineCap: .round)
                         )
                         .rotationEffect(.degrees(-90))
@@ -206,7 +355,7 @@ struct SkinScoreWidgetView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("CELLEUX")
                         .font(.system(size: 10, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color(red: 0.91, green: 0.84, blue: 0.67))
+                        .foregroundStyle(widgetGold)
                         .tracking(1.5)
 
                     Text("Skin Score")
@@ -220,12 +369,12 @@ struct SkinScoreWidgetView: View {
             } else {
                 Image(systemName: "face.smiling")
                     .font(.largeTitle)
-                    .foregroundStyle(Color(red: 0.91, green: 0.84, blue: 0.67))
+                    .foregroundStyle(widgetGold)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("CELLEUX")
                         .font(.system(size: 10, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color(red: 0.91, green: 0.84, blue: 0.67))
+                        .foregroundStyle(widgetGold)
                         .tracking(1.5)
                     Text("Scan to see your skin score")
                         .font(.subheadline)
@@ -234,7 +383,21 @@ struct SkinScoreWidgetView: View {
                 Spacer()
             }
         }
-        .containerBackground(.fill.tertiary, for: .widget)
+        .containerBackground(for: .widget) {
+            ZStack {
+                ContainerRelativeShape()
+                    .fill(Color(.systemBackground))
+
+                ContainerRelativeShape()
+                    .fill(
+                        LinearGradient(
+                            colors: [widgetGold.opacity(0.03), .clear],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+        }
     }
 }
 

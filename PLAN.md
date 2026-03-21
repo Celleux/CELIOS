@@ -10,5 +10,6 @@
 - [x] Create minimal widget Swift files in separate CelleuxWidget/ directory
 - [x] Create widget Info.plist with NSExtensionPointIdentifier
 
-## Next
-- [ ] Verify clean build
+- [x] Upgrade widget views (circular, rectangular, systemSmall) with premium gold design
+- [x] Add widget data writing from HomeViewModel with WidgetCenter refresh
+- [x] Verify clean build

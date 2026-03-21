@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import WidgetKit
 
 @Observable
 final class HomeViewModel {
@@ -229,6 +230,28 @@ final class HomeViewModel {
         loadLongevityFactors(modelContext: modelContext)
         loadLongevityHistory(modelContext: modelContext)
         loadNarrativeInsight(modelContext: modelContext)
+        updateWidgetData()
+    }
+
+    private func updateWidgetData() {
+        let shared = UserDefaults(suiteName: "group.app.rork.celleux-new-ui")
+        shared?.set(Int(targetScore), forKey: "widgetSkinScore")
+
+        let trendString: String
+        if scoreTrend > 1 {
+            trendString = "up"
+        } else if scoreTrend < -1 {
+            trendString = "down"
+        } else {
+            trendString = "stable"
+        }
+        shared?.set(trendString, forKey: "widgetSkinTrend")
+
+        if let lastScan = lastScanDate {
+            shared?.set(lastScan.timeIntervalSince1970, forKey: "widgetLastScanDate")
+        }
+
+        WidgetCenter.shared.reloadTimelines(ofKind: "SkinScoreWidget")
     }
 
     private func loadUserName(modelContext: ModelContext) {
