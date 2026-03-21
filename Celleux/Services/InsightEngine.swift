@@ -192,7 +192,7 @@ final class InsightEngine {
         return stats.map { stat in
             let warmDetail = "We noticed this by looking at your personal history. The more you track, the sharper these patterns become — you're building a unique picture of what works for your skin."
 
-            PersonalInsight(
+            return PersonalInsight(
                 type: .correlationDiscovery,
                 title: "Your \(stat.factor.lowercased()) & skin are connected",
                 body: stat.description,
