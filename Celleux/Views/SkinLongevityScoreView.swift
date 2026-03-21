@@ -10,12 +10,19 @@ struct SkinLongevityScoreView: View {
     @State private var ringGlow: Bool = false
     @State private var selectedChartDate: Date?
     @State private var showCalculation: Bool = false
+    @State private var refreshPulse: Bool = false
+    @State private var navigateToScan: Bool = false
 
     var body: some View {
         ScrollView {
             VStack(spacing: 28) {
-                heroSection
-                    .staggeredAppear(appeared: appeared, delay: 0)
+                if viewModel.compositeScore != nil {
+                    heroSection
+                        .staggeredAppear(appeared: appeared, delay: 0)
+                } else if !viewModel.isLoading {
+                    emptyScanCTA
+                        .staggeredAppear(appeared: appeared, delay: 0)
+                }
 
                 if !viewModel.hasWatchData && !viewModel.isLoading {
                     connectWatchCard
@@ -40,8 +47,13 @@ struct SkinLongevityScoreView: View {
         .navigationTitle("Skin Longevity")
         .navigationBarTitleDisplayMode(.large)
         .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.3), trigger: showCalculation)
+        .sensoryFeedback(.success, trigger: refreshPulse)
+        .navigationDestination(isPresented: $navigateToScan) {
+            ScanView()
+        }
         .task {
             await viewModel.loadData(modelContext: modelContext)
+            viewModel.startAutoRefresh(modelContext: modelContext)
             withAnimation(.spring(response: 0.8, dampingFraction: 0.75)) {
                 appeared = true
             }
@@ -52,10 +64,13 @@ struct SkinLongevityScoreView: View {
                 ringGlow = true
             }
         }
+        .onDisappear {
+            viewModel.stopAutoRefresh()
+        }
     }
 
     private var heroSection: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 16) {
             ZStack {
                 longevityRing
 
@@ -86,12 +101,74 @@ struct SkinLongevityScoreView: View {
                 }
             }
             .frame(maxWidth: .infinity)
+            .scaleEffect(refreshPulse ? 1.02 : 1.0)
+            .animation(.spring(response: 0.4, dampingFraction: 0.6), value: refreshPulse)
+
+            if !viewModel.lastUpdatedString.isEmpty {
+                Text(viewModel.lastUpdatedString)
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundStyle(CelleuxColors.textLabel)
+                    .contentTransition(.numericText())
+            }
 
             if viewModel.trend != 0 {
                 trendBadge
             }
         }
         .padding(.vertical, 16)
+    }
+
+    private var emptyScanCTA: some View {
+        GlassCard(depth: .elevated) {
+            VStack(spacing: 20) {
+                ZStack {
+                    LuxuryBezelRing(
+                        progress: 0,
+                        size: 160,
+                        lineWidth: 10,
+                        glowing: .constant(false)
+                    )
+
+                    VStack(spacing: 6) {
+                        Image(systemName: "viewfinder")
+                            .font(.system(size: 36, weight: .ultraLight))
+                            .foregroundStyle(CelleuxColors.silverGradient)
+
+                        Text("—")
+                            .font(.system(size: 32, weight: .ultraLight))
+                            .foregroundStyle(CelleuxColors.textLabel)
+                    }
+                }
+
+                VStack(spacing: 8) {
+                    Text("Take Your First Scan")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(CelleuxColors.textPrimary)
+
+                    Text("Your Skin Longevity score combines scan data with health metrics for a complete picture.")
+                        .font(.system(size: 13, weight: .regular))
+                        .foregroundStyle(CelleuxColors.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(3)
+                }
+
+                Button {
+                    navigateToScan = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "faceid")
+                            .font(.system(size: 15, weight: .medium))
+                        Text("Start Scan")
+                            .font(.system(size: 15, weight: .semibold))
+                    }
+                    .foregroundStyle(CelleuxColors.warmGold)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                }
+                .buttonStyle(GlassButtonStyle(style: .primary))
+            }
+            .frame(maxWidth: .infinity)
+        }
     }
 
     private var longevityRing: some View {
@@ -199,6 +276,7 @@ struct SkinLongevityScoreView: View {
         let score = viewModel.scoreForFactor(factor)
         let detail = viewModel.detailForFactor(factor)
         let isGold = factor == .adherence
+        let hasData = score != nil
 
         return CompactGlassCard(cornerRadius: 20) {
             VStack(spacing: 14) {
@@ -226,7 +304,8 @@ struct SkinLongevityScoreView: View {
 
                         Image(systemName: factor.icon)
                             .font(.system(size: 17, weight: .light))
-                            .foregroundStyle(isGold ? CelleuxColors.goldGradient : CelleuxColors.silverGradient)
+                            .foregroundStyle(hasData ? (isGold ? CelleuxColors.goldGradient : CelleuxColors.silverGradient) : CelleuxColors.silverGradient)
+                            .opacity(hasData ? 1 : 0.4)
                     }
                     .shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: 2)
 
@@ -238,16 +317,22 @@ struct SkinLongevityScoreView: View {
 
                         Text(detail)
                             .font(.system(size: 13, weight: .regular))
-                            .foregroundStyle(CelleuxColors.textSecondary)
+                            .foregroundStyle(hasData ? CelleuxColors.textSecondary : CelleuxColors.textLabel)
                             .lineLimit(1)
                     }
 
                     Spacer()
 
-                    Text("\(Int(score))")
-                        .font(.system(size: 24, weight: .thin))
-                        .foregroundStyle(CelleuxColors.textPrimary)
-                        .contentTransition(.numericText())
+                    if let scoreVal = score {
+                        Text("\(Int(scoreVal))")
+                            .font(.system(size: 24, weight: .thin))
+                            .foregroundStyle(CelleuxColors.textPrimary)
+                            .contentTransition(.numericText())
+                    } else {
+                        Text("—")
+                            .font(.system(size: 24, weight: .thin))
+                            .foregroundStyle(CelleuxColors.textLabel)
+                    }
                 }
 
                 GeometryReader { geo in
@@ -256,9 +341,11 @@ struct SkinLongevityScoreView: View {
                             .fill(CelleuxColors.silver.opacity(0.08))
                             .frame(height: 4)
 
-                        Capsule()
-                            .fill(isGold ? CelleuxColors.goldGradient : CelleuxColors.silverGradient)
-                            .frame(width: geo.size.width * min(1, score / 100), height: 4)
+                        if let scoreVal = score {
+                            Capsule()
+                                .fill(isGold ? CelleuxColors.goldGradient : CelleuxColors.silverGradient)
+                                .frame(width: geo.size.width * min(1, scoreVal / 100), height: 4)
+                        }
                     }
                 }
                 .frame(height: 4)
