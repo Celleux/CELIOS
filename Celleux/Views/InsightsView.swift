@@ -25,7 +25,7 @@ struct InsightsView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 28) {
+                LazyVStack(spacing: 28) {
                     insightFeedSection
 
                     if hasEnoughData {

@@ -41,7 +41,7 @@ struct ProfileView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 24) {
+                LazyVStack(spacing: 24) {
                     profileHeader
                     statsCard
                     achievementsSection

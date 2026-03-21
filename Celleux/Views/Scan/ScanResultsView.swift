@@ -27,7 +27,7 @@ struct ScanResultsView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 24) {
+            LazyVStack(spacing: 24) {
                 scanCompleteHeader
                 if let cal = calibration, cal.isCalibrating {
                     calibrationBanner(cal)

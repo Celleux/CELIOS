@@ -18,7 +18,7 @@ struct HealthCorrelationView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 28) {
+            LazyVStack(spacing: 28) {
                 if !healthService.hasWatchData {
                     watchConnectionBanner
                         .staggeredAppear(appeared: appeared, delay: 0)

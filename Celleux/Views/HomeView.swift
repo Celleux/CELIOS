@@ -375,6 +375,11 @@ struct HomeView: View {
             x: 0, y: 10
         )
         .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.5), trigger: showLongevityScore)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Skin longevity score")
+        .accessibilityValue("\(Int(viewModel.skinScore)) out of 100\(viewModel.scoreTrend != 0 ? ", trend \(viewModel.scoreTrend > 0 ? "improving" : "declining")" : "")")
+        .accessibilityHint("Opens detailed longevity score view")
+        .accessibilityAddTraits(.isButton)
         .staggeredAppear(appeared: appeared, delay: 0.06)
     }
 
@@ -429,6 +434,7 @@ struct HomeView: View {
         let detail = viewModel.detailForFactor(factor)
 
         return HStack(spacing: 14) {
+            let _ = 0 // accessibility applied at end
             ChromeIconBadge(factor.icon, size: 36, gradient: hasData ? CelleuxColors.iconGoldGradient : CelleuxColors.iconBlueGradient)
                 .opacity(hasData ? 1.0 : 0.45)
 
@@ -487,6 +493,10 @@ struct HomeView: View {
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 4)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(factor.title)")
+        .accessibilityValue(hasData ? "\(Int(score)) out of 100, \(detail)" : "No data available")
+        .accessibilityHint("Shows \(factor.title) details")
     }
 
     // MARK: - 4. Today's Protocol
@@ -726,14 +736,7 @@ struct HomeView: View {
                         .frame(width: 56, height: 56)
 
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(
-                            LinearGradient(
-                                colors: [Color.white, Color.white.opacity(0.0)],
-                                startPoint: .topLeading,
-                                endPoint: .center
-                            ),
-                            lineWidth: 1.5
-                        )
+                        .stroke(CelleuxColors.iconHighlightGradient, lineWidth: 1.5)
                         .frame(width: 56, height: 56)
 
                     Image(systemName: icon)
@@ -759,6 +762,7 @@ struct HomeView: View {
         }
         .buttonStyle(PressableButtonStyle())
         .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.5), trigger: chipFlashId)
+        .accessibilityLabel(title)
     }
 
     // MARK: - 5. Health Snapshot
@@ -1887,28 +1891,25 @@ nonisolated enum MoodAssociationOption: String, CaseIterable, Identifiable, Hash
 struct ChromeToolbarButton: View {
     let icon: String
 
+    private static let chromeBorder = AngularGradient(
+        colors: [CelleuxP3.warmCream.opacity(0.6), CelleuxP3.coolSilver.opacity(0.25), Color.white.opacity(0.5)],
+        center: .center
+    )
+
     var body: some View {
         ZStack {
             Circle()
                 .fill(Color.white.opacity(0.95))
                 .frame(width: 44, height: 44)
             Circle()
-                .stroke(
-                    LinearGradient(
-                        colors: [Color.white, Color.white.opacity(0.0)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
+                .stroke(CelleuxColors.iconHighlightGradient, lineWidth: 1)
                 .frame(width: 44, height: 44)
-            Circle().stroke(
-                AngularGradient(colors: [CelleuxP3.warmCream.opacity(0.6), CelleuxP3.coolSilver.opacity(0.25), Color.white.opacity(0.5)], center: .center),
-                lineWidth: 0.5
-            ).frame(width: 44, height: 44)
+            Circle()
+                .stroke(Self.chromeBorder, lineWidth: 0.5)
+                .frame(width: 44, height: 44)
             Image(systemName: icon)
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Color(red: 0.15, green: 0.15, blue: 0.20))
+                .foregroundStyle(CelleuxColors.textPrimary)
         }
         .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 3)
     }

@@ -137,10 +137,10 @@ enum CelleuxColors {
     static let roseGold = Color(.displayP3, red: 0.831, green: 0.647, blue: 0.455)
 
     static let textPrimary = Color(.displayP3, red: 0.10, green: 0.10, blue: 0.15)
-    static let textSecondary = Color(.displayP3, red: 0.10, green: 0.10, blue: 0.15, opacity: 0.65)
-    static let textTertiary = Color(.displayP3, red: 0.10, green: 0.10, blue: 0.15, opacity: 0.45)
-    static let textLabel = Color(.displayP3, red: 0.10, green: 0.10, blue: 0.15, opacity: 0.45)
-    static let sectionLabel = Color(.displayP3, red: 0.10, green: 0.10, blue: 0.15, opacity: 0.40)
+    static let textSecondary = Color(.displayP3, red: 0.10, green: 0.10, blue: 0.15, opacity: 0.70)
+    static let textTertiary = Color(.displayP3, red: 0.10, green: 0.10, blue: 0.15, opacity: 0.55)
+    static let textLabel = Color(.displayP3, red: 0.10, green: 0.10, blue: 0.15, opacity: 0.55)
+    static let sectionLabel = Color(.displayP3, red: 0.10, green: 0.10, blue: 0.15, opacity: 0.50)
 
     static let glassBackground = Color.white.opacity(0.92)
     static let glassBorder = Color.white.opacity(0.8)
@@ -278,6 +278,40 @@ enum CelleuxColors {
         startPoint: .top,
         endPoint: .bottom
     )
+
+    static let iconHighlightGradient = LinearGradient(
+        colors: [Color.white, Color.white.opacity(0.0)],
+        startPoint: .topLeading,
+        endPoint: .center
+    )
+
+    static let bezelOuterGradient = LinearGradient(
+        colors: [
+            Color.white.opacity(0.95),
+            Color(.displayP3, red: 0.78, green: 0.78, blue: 0.82).opacity(0.5),
+            Color.white.opacity(0.95)
+        ],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
+    static let bezelProgressGradient = LinearGradient(
+        colors: [
+            Color(.displayP3, red: 0.85, green: 0.72, blue: 0.45),
+            Color(.displayP3, red: 0.78, green: 0.66, blue: 0.43)
+        ],
+        startPoint: .topLeading,
+        endPoint: .trailing
+    )
+
+    static let cardInnerHighlight = LinearGradient(
+        colors: [
+            Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.15),
+            Color.clear
+        ],
+        startPoint: .top,
+        endPoint: .center
+    )
 }
 
 extension Color {
@@ -346,9 +380,18 @@ struct CelleuxMeshBackground: View {
 }
 
 struct CelleuxParticleView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var particles: [AmbientParticle] = []
 
     var body: some View {
+        if reduceMotion {
+            Color.clear.allowsHitTesting(false)
+        } else {
+            particleCanvas
+        }
+    }
+
+    private var particleCanvas: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
             let time = timeline.date.timeIntervalSinceReferenceDate
             Canvas { context, size in
@@ -723,18 +766,7 @@ struct LuxuryBezelRing: View {
     var body: some View {
         ZStack {
             Circle()
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.95),
-                            Color(.displayP3, red: 0.78, green: 0.78, blue: 0.82).opacity(0.5),
-                            Color.white.opacity(0.95)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 3
-                )
+                .stroke(CelleuxColors.bezelOuterGradient, lineWidth: 3)
                 .frame(width: size + lineWidth + 8, height: size + lineWidth + 8)
 
             Circle()
@@ -744,14 +776,7 @@ struct LuxuryBezelRing: View {
             Circle()
                 .trim(from: 0, to: progress)
                 .stroke(
-                    LinearGradient(
-                        colors: [
-                            Color(.displayP3, red: 0.85, green: 0.72, blue: 0.45),
-                            Color(.displayP3, red: 0.78, green: 0.66, blue: 0.43)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .trailing
-                    ),
+                    CelleuxColors.bezelProgressGradient,
                     style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
                 )
                 .frame(width: size, height: size)
@@ -765,6 +790,9 @@ struct LuxuryBezelRing: View {
                 .blur(radius: 0.5)
                 .rotationEffect(.degrees(-80))
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Score ring")
+        .accessibilityValue("\(Int(progress * 100)) out of 100")
     }
 }
 
@@ -808,6 +836,9 @@ struct MetricDisplay: View {
                 .textCase(.uppercase)
                 .tracking(0.8)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityValue(value)
     }
 }
 
@@ -835,23 +866,28 @@ struct SectionHeader: View {
 }
 
 struct PulsingDot: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isAnimating: Bool = false
     let color: Color
 
     var body: some View {
         ZStack {
-            Circle()
-                .fill(color.opacity(0.2))
-                .frame(width: 16, height: 16)
-                .scaleEffect(isAnimating ? 1.5 : 1.0)
-                .opacity(isAnimating ? 0 : 0.6)
+            if !reduceMotion {
+                Circle()
+                    .fill(color.opacity(0.2))
+                    .frame(width: 16, height: 16)
+                    .scaleEffect(isAnimating ? 1.5 : 1.0)
+                    .opacity(isAnimating ? 0 : 0.6)
+            }
 
             Circle()
                 .fill(color)
                 .frame(width: 8, height: 8)
                 .shadow(color: color.opacity(0.5), radius: 4, x: 0, y: 0)
         }
+        .accessibilityHidden(true)
         .onAppear {
+            guard !reduceMotion else { return }
             withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: false)) {
                 isAnimating = true
             }
@@ -860,25 +896,31 @@ struct PulsingDot: View {
 }
 
 struct ShimmerEffect: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var phase: CGFloat = -1
 
     func body(content: Content) -> some View {
         content
             .overlay(
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(0),
-                        Color.white.opacity(0.15),
-                        Color.white.opacity(0)
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-                .offset(x: phase * 300)
-                .allowsHitTesting(false)
+                Group {
+                    if !reduceMotion {
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0),
+                                Color.white.opacity(0.15),
+                                Color.white.opacity(0)
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                        .offset(x: phase * 300)
+                        .allowsHitTesting(false)
+                    }
+                }
             )
             .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
             .onAppear {
+                guard !reduceMotion else { return }
                 withAnimation(.easeInOut(duration: 3.5).repeatForever(autoreverses: false)) {
                     phase = 1
                 }
@@ -887,21 +929,27 @@ struct ShimmerEffect: ViewModifier {
 }
 
 struct SkeletonShimmerEffect: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var startPoint: UnitPoint = UnitPoint(x: -0.3, y: -0.3)
 
     func body(content: Content) -> some View {
         content
             .redacted(reason: .placeholder)
             .overlay(
-                LinearGradient(
-                    colors: [.clear, Color.white.opacity(0.25), .clear],
-                    startPoint: startPoint,
-                    endPoint: UnitPoint(x: startPoint.x + 0.6, y: startPoint.y + 0.6)
-                )
-                .allowsHitTesting(false)
+                Group {
+                    if !reduceMotion {
+                        LinearGradient(
+                            colors: [.clear, Color.white.opacity(0.25), .clear],
+                            startPoint: startPoint,
+                            endPoint: UnitPoint(x: startPoint.x + 0.6, y: startPoint.y + 0.6)
+                        )
+                        .allowsHitTesting(false)
+                    }
+                }
             )
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .onAppear {
+                guard !reduceMotion else { return }
                 withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: false)) {
                     startPoint = UnitPoint(x: 1.3, y: 1.3)
                 }
@@ -919,11 +967,7 @@ extension View {
     }
 
     func staggeredAppear(appeared: Bool, delay: Double) -> some View {
-        self
-            .opacity(appeared ? 1 : 0)
-            .offset(y: appeared ? 0 : 20)
-            .scaleEffect(appeared ? 1 : 0.97)
-            .animation(.spring(duration: 0.5, bounce: 0.2).delay(delay), value: appeared)
+        self.modifier(StaggeredAppearModifier(appeared: appeared, delay: delay))
     }
 
     func premiumCardStyle(depth: GlassDepth = .standard) -> some View {
@@ -955,14 +999,7 @@ struct ChromeIconBadge: View {
                 .frame(width: size, height: size)
 
             Circle()
-                .stroke(
-                    LinearGradient(
-                        colors: [Color.white, Color.white.opacity(0.0)],
-                        startPoint: .topLeading,
-                        endPoint: .center
-                    ),
-                    lineWidth: 1.5
-                )
+                .stroke(CelleuxColors.iconHighlightGradient, lineWidth: 1.5)
                 .frame(width: size, height: size)
 
             Image(systemName: systemName)
@@ -970,6 +1007,7 @@ struct ChromeIconBadge: View {
                 .foregroundStyle(gradientStyle)
         }
         .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
+        .accessibilityHidden(true)
     }
 }
 
@@ -1011,14 +1049,7 @@ struct GlowingAccentBadge: View {
                 .frame(width: size, height: size)
 
             Circle()
-                .stroke(
-                    LinearGradient(
-                        colors: [Color.white, Color.white.opacity(0.0)],
-                        startPoint: .topLeading,
-                        endPoint: .center
-                    ),
-                    lineWidth: 1.5
-                )
+                .stroke(CelleuxColors.iconHighlightGradient, lineWidth: 1.5)
                 .frame(width: size, height: size)
 
             Image(systemName: systemName)
@@ -1032,6 +1063,29 @@ struct GlowingAccentBadge: View {
                 )
         }
         .shadow(color: color.opacity(0.25), radius: 8, x: 0, y: 4)
+        .accessibilityHidden(true)
+    }
+}
+
+// MARK: - Staggered Appear (Reduce Motion aware)
+
+struct StaggeredAppearModifier: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let appeared: Bool
+    let delay: Double
+
+    func body(content: Content) -> some View {
+        if reduceMotion {
+            content
+                .opacity(appeared ? 1 : 0)
+                .animation(.easeInOut(duration: 0.2).delay(delay * 0.5), value: appeared)
+        } else {
+            content
+                .opacity(appeared ? 1 : 0)
+                .offset(y: appeared ? 0 : 20)
+                .scaleEffect(appeared ? 1 : 0.97)
+                .animation(.spring(duration: 0.5, bounce: 0.2).delay(delay), value: appeared)
+        }
     }
 }
 

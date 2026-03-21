@@ -319,6 +319,8 @@ struct ScanView: View {
                 }
                 .buttonStyle(Premium3DButtonStyle())
                 .sensoryFeedback(.impact(flexibility: .rigid, intensity: 0.8), trigger: scanTrigger)
+                .accessibilityLabel("Start skin scan")
+                .accessibilityHint("Begins analyzing your skin using the front camera")
 
                 Button {
                     withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
@@ -344,6 +346,8 @@ struct ScanView: View {
                     )
                 }
                 .shadow(color: Color(hex: "E8D6A8").opacity(0.15), radius: 10, x: 0, y: 4)
+                .accessibilityLabel("AR skin map")
+                .accessibilityHint("Shows an augmented reality heat map of your skin")
             }
 
             Text(viewModel.lastScanText)
@@ -407,6 +411,9 @@ struct ScanView: View {
         .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 3)
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.isFaceDetected)
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.lightingQuality)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(viewModel.isFaceDetected ? "Face detected, ready to scan" : "Position your face in the camera")
+        .accessibilityValue("Lighting: \(viewModel.lightingQuality.rawValue)")
         .onAppear {
             withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
                 faceGuidePulse = true

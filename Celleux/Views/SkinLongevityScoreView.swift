@@ -17,7 +17,7 @@ struct SkinLongevityScoreView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 28) {
+            LazyVStack(spacing: 28) {
                 if viewModel.compositeScore != nil {
                     heroSection
                         .staggeredAppear(appeared: appeared, delay: 0)

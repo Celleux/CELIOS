@@ -1,39 +1,66 @@
-# Aging Simulation — Predict Your Skin's Future
+# Performance Audit & Accessibility Polish
 
+## What's Changing
 
-## Features
+A comprehensive polish pass across the entire app focusing on **performance optimization** and **full accessibility support**.
 
-- **Aging Trajectory Projection** — Uses your current skin metrics (wrinkle depth, elasticity, hydration, texture, radiance) to simulate how your face may age over 5, 10, and 20 years
-- **Dual Scenario Comparison** — See two futures side-by-side via a drag slider: "At Current Rate" (no routine) vs. "With CELLEUX Routine" (optimistic improvement trajectory)
-- **Year Selector** — Tap between 5, 10, and 20 year projections; each applies progressively stronger aging effects
-- **Simulated Score Projections** — Below the face comparison, see projected overall score and key metric scores for each scenario at the selected year
-- **Medical Disclaimer** — Clear banner at the bottom: "Simulation only. Not a medical prediction."
-- **Share Comparison** — Export the current slider view as an image to share
+---
 
-## Design
+### 1. Performance Audit
 
-- **Dark cinematic background** matching the existing Before/After comparison screen (deep navy/black with subtle gold radial glow)
-- **Slider overlay** — Draggable vertical divider splitting the face photo; left side shows "At Current Rate", right side shows "With CELLEUX Routine"
-- **Year selector** — Three gold-accented capsule buttons (5Y / 10Y / 20Y) horizontally centered below the slider
-- **Scenario labels** — "AT CURRENT RATE" on the left in amber/warm tone, "WITH CELLEUX" on the right in green/gold tone, using the app's signature uppercase tracking style
-- **Projected scores section** — Two compact glass cards side by side showing projected overall score with a mini ring, plus 3 key metrics (Wrinkles, Elasticity, Hydration) as mini bars
-- **Disclaimer** — Subtle caption text at the very bottom in the app's tertiary text color
-- **Entry animation** — Face fades in with a subtle scale spring, year buttons stagger in, scores animate with number counting
-- **Haptic feedback** on year selection changes
+**Gradient & Shadow Optimization**
+- Move all inline gradients (gold, silver, chrome, glass borders) to static constants in the design system so they're created once, not on every view render
+- Group shadow application to container cards instead of individual sub-elements where stacking occurs
 
-## Screens
+**ARKit Session Management**
+- Pause the AR face tracking session when the user navigates away from the Scan tab
+- Resume the session when the user returns — saves battery and GPU resources
 
-- **Aging Simulation Sheet** — Full-screen sheet presented from the Scan Results screen via a new "Aging Simulation" button (placed near the existing comparison/share buttons). Contains:
-  - Top header bar with title "AGING SIMULATION" and close button
-  - Face photo with slider overlay comparing two aging scenarios
-  - Year selector (5 / 10 / 20)
-  - Projected score cards for both scenarios
-  - Disclaimer text
-  - Share button
+**Lazy Loading for All Scrollable Content**
+- Convert remaining `VStack` inside `ScrollView` to `LazyVStack` in history views, insights, health correlation, and profile
+- Ensures only visible content is rendered, especially for long lists
 
-## How It Works
+**Chart Data Precomputation**
+- Precompute chart data arrays in the view model before passing to Chart views, avoiding recalculation on every render
 
-- The simulation uses image processing filters (blur, contrast adjustment, noise, desaturation, sharpening) applied to the user's actual scan photo, calibrated by their real skin metric scores
-- Lower current scores = more aggressive aging in the "At Current Rate" scenario
-- The "With CELLEUX Routine" scenario assumes gradual metric improvement, resulting in a gentler aging progression
-- No external AI model needed — all processing happens locally on-device using built-in image filters
+---
+
+### 2. Accessibility
+
+**VoiceOver Labels on All Interactive Elements**
+- Add descriptive labels to every button, card, tab bar item, score ring, metric display, and chart
+- Add `accessibilityValue` for all scores and metrics (e.g. "82 out of 100")
+- Add `accessibilityHint` for key actions (e.g. "Opens scan history")
+
+**Meaningful Chart & Ring Descriptions**
+- Score rings will announce their value and context (e.g. "Skin score 82 out of 100, improving")
+- Charts will have summary descriptions (e.g. "Weekly skin score trend, ranging from 75 to 88")
+- Factor rows will combine icon, name, and score into a single accessible element
+
+**Minimum 44pt Tap Targets**
+- Audit all buttons and tappable areas to ensure minimum 44×44pt touch targets
+- Fix any undersized chip/tag buttons in mood check-in and time range selectors
+
+**Dynamic Type Support**
+- Replace all fixed `.system(size:)` fonts in the design system (`CelleuxType`) with scaled variants using `.font(.system(size:).leading(.tight))` combined with `@ScaledMetric` where needed
+- Key content areas (greeting, protocol items, insights, metric values) will respect the user's preferred text size
+
+**Reduce Motion Support**
+- Detect the system "Reduce Motion" preference
+- Replace spring animations with simple opacity fades when Reduce Motion is enabled
+- Disable the particle view, shimmer effects, and pulsing dots when Reduce Motion is on
+- The `staggeredAppear` modifier will use a simple fade instead of offset + scale
+
+**Contrast Improvements**
+- Audit all text colors against their backgrounds for WCAG AA minimum
+- Adjust `textLabel` and `textTertiary` opacity to ensure readability on light card surfaces
+- Ensure gold-on-white elements have sufficient contrast
+
+---
+
+### Files That Will Be Modified
+- Design system (gradients, typography, accessibility helpers)
+- All main views (Home, Scan, Insights, Ritual, Profile, and their sub-views)
+- Content view (tab bar accessibility)
+- AR face tracking view (session pause/resume)
+- View models (chart data precomputation)

@@ -138,16 +138,7 @@ struct ContentView: View {
 
                 if isSelected {
                     Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    CelleuxColors.warmGold.opacity(0.7),
-                                    CelleuxColors.champagneGold
-                                ],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
+                        .fill(Self.tabUnderlineGradient)
                         .frame(width: 20, height: 2)
                         .shadow(color: CelleuxColors.goldGlow, radius: 4, x: 0, y: 1)
                         .matchedGeometryEffect(id: "tabUnderline", in: tabNamespace)
@@ -168,6 +159,10 @@ struct ContentView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(tab.label)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityHint(isSelected ? "" : "Switch to \(tab.label) tab")
         .contextMenu {
             ForEach(tab.quickActions, id: \.label) { action in
                 Button {
@@ -183,39 +178,41 @@ struct ContentView: View {
         }
     }
 
+    private static let tabBarHighlight = LinearGradient(
+        colors: [Color.white.opacity(0.15), Color.clear],
+        startPoint: .top,
+        endPoint: .center
+    )
+
+    private static let tabBarChromeBorder = AngularGradient(
+        colors: [
+            CelleuxColors.silverLight.opacity(0.6),
+            CelleuxColors.warmGold.opacity(0.45),
+            Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.8),
+            CelleuxColors.silverBorder.opacity(0.5),
+            CelleuxColors.champagneGold.opacity(0.35),
+            Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.7),
+            CelleuxColors.silverLight.opacity(0.6)
+        ],
+        center: .center
+    )
+
+    private static let tabUnderlineGradient = LinearGradient(
+        colors: [CelleuxColors.warmGold.opacity(0.7), CelleuxColors.champagneGold],
+        startPoint: .leading,
+        endPoint: .trailing
+    )
+
     private var tabBarBackground: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .fill(Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.95))
 
             RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.15),
-                            Color.clear
-                        ],
-                        startPoint: .top,
-                        endPoint: .center
-                    )
-                )
+                .fill(Self.tabBarHighlight)
 
             RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .stroke(
-                    AngularGradient(
-                        colors: [
-                            CelleuxColors.silverLight.opacity(0.6),
-                            CelleuxColors.warmGold.opacity(0.45),
-                            Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.8),
-                            CelleuxColors.silverBorder.opacity(0.5),
-                            CelleuxColors.champagneGold.opacity(0.35),
-                            Color(.displayP3, red: 1.0, green: 1.0, blue: 1.0, opacity: 0.7),
-                            CelleuxColors.silverLight.opacity(0.6)
-                        ],
-                        center: .center
-                    ),
-                    lineWidth: 1.5
-                )
+                .stroke(Self.tabBarChromeBorder, lineWidth: 1.5)
         }
         .celleuxDepthShadow()
     }
