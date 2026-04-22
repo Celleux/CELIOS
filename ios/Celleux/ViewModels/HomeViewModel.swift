@@ -36,6 +36,7 @@ final class HomeViewModel {
 
     var selectedWeeklyScore: DailyScore? = nil
     var protocolCompletionTrigger: Bool = false
+    var dailyQuests: [DailyQuest] = []
 
     private let healthService = HealthKitService.shared
     private let correlationService = SkinHealthCorrelationService.shared
@@ -231,6 +232,7 @@ final class HomeViewModel {
         loadLongevityFactors(modelContext: modelContext)
         loadLongevityHistory(modelContext: modelContext)
         loadNarrativeInsight(modelContext: modelContext)
+        dailyQuests = GamificationEngine.shared.todayQuests(modelContext: modelContext)
         updateWidgetData(modelContext: modelContext)
         isInitialLoad = false
     }
@@ -585,6 +587,14 @@ final class HomeViewModel {
         updateStreak(modelContext: modelContext)
         try? modelContext.save()
 
+        if protocolItems[index].isCompleted {
+            GamificationEngine.shared.award(.doseLogged)
+            if protocolItems.allSatisfy(\.isCompleted) {
+                GamificationEngine.shared.award(.dailyAllDosesComplete)
+            }
+        }
+        dailyQuests = GamificationEngine.shared.todayQuests(modelContext: modelContext)
+
         AchievementEngine.shared.checkAll(modelContext: modelContext)
         AchievementEngine.shared.recordChallengeCheckIn(modelContext: modelContext)
     }
@@ -606,8 +616,13 @@ final class HomeViewModel {
             checkDate = calendar.date(byAdding: .day, value: -1, to: checkDate) ?? checkDate
         }
 
+        let previousStreak = streakDays
         streakDays = streak
         UserDefaults.standard.set(streak, forKey: "adherenceStreak")
+
+        if streak > previousStreak, StreakMilestone.milestones.contains(streak) {
+            GamificationEngine.shared.award(.streakMilestone)
+        }
     }
 
     func animateScore() {

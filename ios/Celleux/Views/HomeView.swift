@@ -13,11 +13,13 @@ struct HomeView: View {
     @State private var countdownText: String? = nil
     @State private var showLongevityScore: Bool = false
     @State private var showMoodCheckIn: Bool = false
+    @State private var showWaterLog: Bool = false
     @State private var breathingShadow: Bool = false
     @State private var overdueGlow: Bool = false
     @State private var selectedFactor: LongevityFactor? = nil
     @State private var achievementCelebration: Bool = false
     @State private var showChallengeDetail: Bool = false
+    @State private var gamification = GamificationEngine.shared
     @Query(filter: #Predicate<SkinTransformationChallenge> { $0.isActive == true }) private var activeChallenges: [SkinTransformationChallenge]
     @Namespace private var heroAnimation
 
@@ -39,6 +41,7 @@ struct HomeView: View {
                         }
 
                         greetingSection
+                        levelProgressCard
                         if viewModel.isInitialLoad {
                             GoldSkeletonCard(style: .scoreHero)
                                 .transition(.opacity)
@@ -56,6 +59,7 @@ struct HomeView: View {
                             todaysProtocolCard
                             healthSnapshotSection
                             quickActionsRow
+                            dailyQuestsCard
                             weeklyTrendCard
                             streakAchievementSection
                             challengeCard
@@ -90,6 +94,15 @@ struct HomeView: View {
             .navigationDestination(isPresented: $showLongevityScore) {
                 SkinLongevityScoreView()
                     .navigationTransition(.zoom(sourceID: "scoreHero", in: heroAnimation))
+            }
+            .sheet(isPresented: $showWaterLog) {
+                WaterLogSheet(onLogged: {
+                    viewModel.dailyQuests = GamificationEngine.shared.todayQuests(modelContext: modelContext)
+                })
+                .presentationDetents([.height(340)])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(.ultraThinMaterial)
+                .presentationCornerRadius(32)
             }
             .sheet(isPresented: $showMoodCheckIn) {
                 MoodCheckInSheet()
@@ -731,6 +744,9 @@ struct HomeView: View {
                     quickActionChip(title: "Log Mood", icon: "face.smiling", color: CelleuxColors.warmGold) {
                         showMoodCheckIn = true
                     }
+                    quickActionChip(title: "Log Water", icon: "drop.fill", color: CelleuxColors.warmGold) {
+                        showWaterLog = true
+                    }
                     quickActionChip(title: "View Trends", icon: "chart.line.uptrend.xyaxis", color: CelleuxP3.coolSilver) {
                         switchTab(.insights)
                     }
@@ -1303,6 +1319,157 @@ struct HomeView: View {
         }
     }
 
+    // MARK: - Level Progress Card
+
+    private var levelProgressCard: some View {
+        let lvl = gamification.level
+        return HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(RadialGradient(colors: [CelleuxColors.warmGold.opacity(0.15), Color.clear], center: .center, startRadius: 0, endRadius: 30))
+                    .frame(width: 56, height: 56)
+                Circle()
+                    .stroke(CelleuxColors.silver.opacity(0.12), lineWidth: 4)
+                    .frame(width: 52, height: 52)
+                Circle()
+                    .trim(from: 0, to: lvl.progress)
+                    .stroke(AngularGradient(colors: [CelleuxColors.warmGold, CelleuxColors.roseGold, CelleuxColors.champagneGold, CelleuxColors.warmGold], center: .center), style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                    .frame(width: 52, height: 52)
+                    .rotationEffect(.degrees(-90))
+                    .animation(CelleuxSpring.luxury, value: lvl.progress)
+                Text("\(lvl.level)")
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .foregroundStyle(CelleuxColors.goldGradient)
+                    .contentTransition(.numericText())
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text("LEVEL \(lvl.level)")
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundStyle(CelleuxColors.warmGold)
+                        .tracking(1.2)
+                    Text("·")
+                        .foregroundStyle(CelleuxColors.textLabel)
+                    Text(lvl.title.uppercased())
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .foregroundStyle(CelleuxColors.textPrimary)
+                        .tracking(1.0)
+                }
+                Text("\(lvl.currentXP) / \(lvl.nextLevelXP) XP")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(CelleuxColors.textPrimary)
+                    .contentTransition(.numericText())
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(CelleuxColors.silver.opacity(0.10)).frame(height: 4)
+                        Capsule().fill(CelleuxColors.goldGradient)
+                            .frame(width: geo.size.width * lvl.progress, height: 4)
+                            .shadow(color: CelleuxColors.warmGold.opacity(0.5), radius: 4)
+                            .animation(CelleuxSpring.luxury, value: lvl.progress)
+                    }
+                }
+                .frame(height: 4)
+            }
+
+            Spacer()
+
+            if gamification.showXPGain {
+                VStack(spacing: 2) {
+                    Text("+\(gamification.recentGain)")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundStyle(CelleuxColors.warmGold)
+                    Text("XP")
+                        .font(.system(size: 8, weight: .bold, design: .rounded))
+                        .foregroundStyle(CelleuxColors.warmGold.opacity(0.7))
+                        .tracking(1.0)
+                }
+                .transition(.scale(scale: 0.5).combined(with: .opacity))
+            }
+        }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color.white.opacity(0.92)))
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(CelleuxColors.glassEdgeHighlight, lineWidth: 1))
+        .celleuxDepthShadow()
+        .staggeredAppear(appeared: appeared, delay: 0.03)
+    }
+
+    // MARK: - Daily Quests
+
+    private var dailyQuestsCard: some View {
+        let quests = viewModel.dailyQuests
+        let completed = quests.filter(\.isComplete).count
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(CelleuxColors.warmGold)
+                    Text("DAILY QUESTS")
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(CelleuxColors.textLabel)
+                        .tracking(1.5)
+                }
+                Spacer()
+                Text("\(completed) / \(quests.count)")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(CelleuxColors.warmGold)
+                    .contentTransition(.numericText())
+            }
+
+            VStack(spacing: 8) {
+                ForEach(quests) { quest in
+                    questRow(quest)
+                }
+            }
+        }
+        .padding(18)
+        .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Color.white.opacity(0.92)))
+        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(CelleuxColors.glassEdgeHighlight, lineWidth: 1))
+        .celleuxDepthShadow()
+        .staggeredAppear(appeared: appeared, delay: 0.22)
+    }
+
+    private func questRow(_ quest: DailyQuest) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(quest.isComplete ? CelleuxColors.warmGold.opacity(0.12) : CelleuxColors.silver.opacity(0.08))
+                    .frame(width: 36, height: 36)
+                Circle()
+                    .trim(from: 0, to: quest.progress)
+                    .stroke(CelleuxColors.goldGradient, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    .frame(width: 36, height: 36)
+                    .rotationEffect(.degrees(-90))
+                    .animation(CelleuxSpring.luxury, value: quest.progress)
+                Image(systemName: quest.isComplete ? "checkmark" : quest.icon)
+                    .font(.system(size: 14, weight: quest.isComplete ? .bold : .medium))
+                    .foregroundStyle(quest.isComplete ? CelleuxColors.warmGold : CelleuxColors.silver)
+                    .contentTransition(.symbolEffect(.replace))
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(quest.title)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(quest.isComplete ? CelleuxColors.textLabel : CelleuxColors.textPrimary)
+                    .strikethrough(quest.isComplete, color: CelleuxColors.textLabel)
+                Text(quest.subtitle)
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundStyle(CelleuxColors.textLabel)
+            }
+            Spacer()
+            HStack(spacing: 3) {
+                Image(systemName: "bolt.fill")
+                    .font(.system(size: 9, weight: .bold))
+                Text("+\(quest.xp)")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+            }
+            .foregroundStyle(quest.isComplete ? CelleuxColors.textLabel : CelleuxColors.warmGold)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Capsule().fill(quest.isComplete ? CelleuxColors.silver.opacity(0.08) : CelleuxColors.warmGold.opacity(0.10)))
+        }
+    }
+
     // MARK: - Challenge Card
 
     @ViewBuilder
@@ -1848,6 +2015,7 @@ struct MoodCheckInSheet: View {
             modelContext.insert(checkIn)
             try? modelContext.save()
 
+            GamificationEngine.shared.award(.moodLogged)
             saveTrigger.toggle()
             isSaving = false
             dismiss()

@@ -413,11 +413,23 @@ final class SkinScanViewModel {
             }
         }
 
+        let previousBest = UserDefaults.standard.integer(forKey: "celleuxBestScore")
+        let newScoreInt = Int(analysis.overallScore.rounded())
+
         modelContext.insert(record)
-        UserDefaults.standard.set(Int(analysis.overallScore.rounded()), forKey: "latestSkinScore")
+        UserDefaults.standard.set(newScoreInt, forKey: "latestSkinScore")
 
         AchievementEngine.shared.checkAll(modelContext: modelContext)
         AchievementEngine.shared.recordChallengeCheckIn(modelContext: modelContext)
+        GamificationEngine.shared.award(.scanCompleted)
+        GamificationEngine.shared.award(.challengeCheckIn)
+
+        if newScoreInt > previousBest && previousBest > 0 {
+            GamificationEngine.shared.award(.personalBest)
+        }
+        if newScoreInt > previousBest {
+            UserDefaults.standard.set(newScoreInt, forKey: "celleuxBestScore")
+        }
 
         try? modelContext.save()
     }

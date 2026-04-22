@@ -195,16 +195,42 @@ struct ProfileView: View {
     // MARK: - Stats
 
     private var statsCard: some View {
-        GlassCard {
-            HStack(spacing: 0) {
-                statItem(value: "\(scans.count)", label: "Scans")
-                statDivider
-                statItem(value: "\(streak)", label: "Day Streak")
-                statDivider
-                statItem(value: "\(checkIns.count)", label: "Check-Ins")
-                statDivider
-                statItem(value: "\(unlockedAchievements.count)", label: "Badges")
+        let lvl = GamificationEngine.shared.level
+        return VStack(spacing: 14) {
+            GlassCard {
+                HStack(spacing: 0) {
+                    statItem(value: "\(lvl.level)", label: "Level")
+                    statDivider
+                    statItem(value: "\(scans.count)", label: "Scans")
+                    statDivider
+                    statItem(value: "\(streak)", label: "Streak")
+                    statDivider
+                    statItem(value: "\(unlockedAchievements.count)", label: "Badges")
+                }
             }
+
+            HStack(spacing: 10) {
+                Image(systemName: "bolt.fill")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(CelleuxColors.warmGold)
+                Text("\(lvl.currentXP) / \(lvl.nextLevelXP) XP")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(CelleuxColors.textPrimary)
+                    .contentTransition(.numericText())
+                Spacer()
+                Text(lvl.title.uppercased())
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .foregroundStyle(CelleuxColors.warmGold)
+                    .tracking(1.2)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                Capsule().fill(Color.white.opacity(0.7))
+            )
+            .overlay(
+                Capsule().stroke(CelleuxColors.warmGold.opacity(0.25), lineWidth: 1)
+            )
         }
         .staggeredAppear(appeared: appeared, delay: 0.08)
     }

@@ -9,6 +9,7 @@ struct ContentView: View {
     @State private var contentAppeared: Bool = false
     @State private var longPressTab: AppTab? = nil
     @State private var achievementEngine = AchievementEngine.shared
+    @State private var gamification = GamificationEngine.shared
     @Namespace private var tabNamespace
 
     var body: some View {
@@ -43,6 +44,14 @@ struct ContentView: View {
                 }
                 .transition(.opacity)
                 .zIndex(100)
+            }
+
+            if gamification.showLevelUp {
+                LevelUpOverlay(level: gamification.level) {
+                    gamification.dismissLevelUp()
+                }
+                .transition(.opacity)
+                .zIndex(101)
             }
         }
         .ignoresSafeArea(.keyboard)

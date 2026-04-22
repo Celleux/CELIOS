@@ -93,6 +93,8 @@ final class HealthKitService {
 
         let shareTypes: Set<HKSampleType> = [
             HKSampleType.stateOfMindType(),
+            HKQuantityType(.dietaryWater),
+            HKCategoryType(.mindfulSession),
         ]
 
         do {
@@ -171,6 +173,44 @@ final class HealthKitService {
         if !recentMoodEntries.isEmpty {
             latestMoodValence = recentMoodEntries.first?.valence
             averageMoodValence = recentMoodEntries.map(\.valence).reduce(0, +) / Double(recentMoodEntries.count)
+        }
+    }
+
+    @discardableResult
+    func logWater(milliliters: Double) async -> Bool {
+        guard isAvailable, milliliters > 0 else { return false }
+        let quantity = HKQuantity(unit: .literUnit(with: .milli), doubleValue: milliliters)
+        let sample = HKQuantitySample(
+            type: HKQuantityType(.dietaryWater),
+            quantity: quantity,
+            start: Date(),
+            end: Date()
+        )
+        do {
+            try await store.save(sample)
+            todayWaterIntake = (todayWaterIntake ?? 0) + milliliters
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    @discardableResult
+    func logMindfulSession(durationSeconds: Double) async -> Bool {
+        guard isAvailable, durationSeconds > 0 else { return false }
+        let end = Date()
+        let start = end.addingTimeInterval(-durationSeconds)
+        let sample = HKCategorySample(
+            type: HKCategoryType(.mindfulSession),
+            value: HKCategoryValue.notApplicable.rawValue,
+            start: start,
+            end: end
+        )
+        do {
+            try await store.save(sample)
+            return true
+        } catch {
+            return false
         }
     }
 

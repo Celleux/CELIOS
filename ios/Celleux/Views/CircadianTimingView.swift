@@ -387,6 +387,8 @@ struct CircadianTimingView: View {
                         toggleTrigger.toggle()
                         completionCelebration += 1
                     }
+                    Task { await HealthKitService.shared.logMindfulSession(durationSeconds: 30) }
+                    GamificationEngine.shared.award(.breathingCompleted)
                     withAnimation(CelleuxSpring.snappy) {
                         viewModel.stopBreathingTimer()
                     }
