@@ -127,6 +127,7 @@ nonisolated enum OnboardingPage: Int, CaseIterable, Sendable {
     case referralSource
     case analyzing
     case projectedResults
+    case ratingRequest
     case permissions
     case completion
 

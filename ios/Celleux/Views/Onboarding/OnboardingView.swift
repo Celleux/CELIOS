@@ -111,6 +111,10 @@ struct OnboardingView: View {
             ProjectedResultsView(viewModel: viewModel) {
                 navigateForward()
             }
+        case .ratingRequest:
+            RatingRequestView {
+                navigateForward()
+            }
         case .permissions:
             PermissionsView(viewModel: viewModel) {
                 navigateForward()
