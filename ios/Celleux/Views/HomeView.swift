@@ -56,6 +56,8 @@ struct HomeView: View {
                                 emptyScoreCard
                             }
                             longevityCompositeCard
+                            SkinForecastCardContainer()
+                                .staggeredAppear(appeared: appeared, delay: 0.12)
                             todaysProtocolCard
                             healthSnapshotSection
                             quickActionsRow
