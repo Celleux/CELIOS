@@ -91,8 +91,24 @@ struct OnboardingView: View {
             ValuePropLongevityScoreView()
         case .smartTiming:
             ValuePropSmartTimingView()
+        case .socialProof:
+            SocialProofView {
+                navigateForward()
+            }
         case .personalization:
             PersonalizationView(viewModel: viewModel) {
+                navigateForward()
+            }
+        case .referralSource:
+            ReferralSourceView(viewModel: viewModel) {
+                navigateForward()
+            }
+        case .analyzing:
+            AnalyzingView(viewModel: viewModel) {
+                navigateForward()
+            }
+        case .projectedResults:
+            ProjectedResultsView(viewModel: viewModel) {
                 navigateForward()
             }
         case .permissions:

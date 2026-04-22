@@ -16,6 +16,7 @@ final class OnboardingViewModel {
     var selectedConcerns: Set<String> = []
     var selectedGender: String? = nil
     var selectedSkinType: FitzpatrickType? = nil
+    var referralSource: String? = nil
 
     var healthConnected: Bool = false
     var notificationsEnabled: Bool = false
@@ -121,7 +122,11 @@ nonisolated enum OnboardingPage: Int, CaseIterable, Sendable {
     case skinTracking
     case longevityScore
     case smartTiming
+    case socialProof
     case personalization
+    case referralSource
+    case analyzing
+    case projectedResults
     case permissions
     case completion
 
