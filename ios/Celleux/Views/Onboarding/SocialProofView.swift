@@ -15,7 +15,7 @@ struct SocialProofView: View {
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
-                VStack(spacing: CelleuxSpacing.lg) {
+                LazyVStack(spacing: CelleuxSpacing.lg) {
                     ratingHeader
                         .padding(.top, CelleuxSpacing.xxl)
                         .staggeredAppear(appeared: appeared, delay: 0)

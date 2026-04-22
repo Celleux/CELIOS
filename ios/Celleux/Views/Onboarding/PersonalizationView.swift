@@ -11,7 +11,7 @@ struct PersonalizationView: View {
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
-                VStack(spacing: CelleuxSpacing.lg) {
+                LazyVStack(spacing: CelleuxSpacing.lg) {
                     VStack(spacing: CelleuxSpacing.sm) {
                         Text("Let's personalize")
                             .font(.system(size: 30, weight: .light))

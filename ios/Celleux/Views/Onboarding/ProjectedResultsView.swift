@@ -29,7 +29,7 @@ struct ProjectedResultsView: View {
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
-                VStack(spacing: CelleuxSpacing.lg) {
+                LazyVStack(spacing: CelleuxSpacing.lg) {
                     header
                         .staggeredAppear(appeared: appeared, delay: 0)
                         .padding(.top, CelleuxSpacing.xl)

@@ -20,7 +20,7 @@ struct ReferralSourceView: View {
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
-                VStack(spacing: CelleuxSpacing.lg) {
+                LazyVStack(spacing: CelleuxSpacing.lg) {
                     VStack(spacing: CelleuxSpacing.sm) {
                         Text("Where did you\nhear about us?")
                             .font(.system(size: 30, weight: .light))
