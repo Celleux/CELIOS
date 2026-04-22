@@ -29,7 +29,7 @@ struct ProgressComparisonView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 24) {
+            LazyVStack(spacing: 24) {
                 headerBar
                 timeframePicker
                 overallDelta

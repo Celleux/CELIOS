@@ -3,13 +3,13 @@ import SwiftUI
 // MARK: - Typography System
 
 enum CelleuxType {
-    static var display: Font { .system(size: 48, weight: .ultraLight) }
-    static var title1: Font { .system(size: 32, weight: .light) }
-    static var headline: Font { .system(size: 18, weight: .regular) }
-    static var body: Font { .system(size: 16, weight: .regular) }
-    static var caption: Font { .system(size: 12, weight: .light) }
+    static var display: Font { .system(.largeTitle, design: .default).weight(.ultraLight) }
+    static var title1: Font { .system(.title, design: .default).weight(.light) }
+    static var headline: Font { .system(.headline, design: .default).weight(.regular) }
+    static var body: Font { .system(.body, design: .default) }
+    static var caption: Font { .system(.caption, design: .default).weight(.light) }
     static var label: Font { .system(size: 8, weight: .bold) }
-    static var metric: Font { .system(size: 56, weight: .thin) }
+    static var metric: Font { .system(.largeTitle, design: .default).weight(.thin) }
 
     static let displayTracking: CGFloat = 2
     static let title1Tracking: CGFloat = 1

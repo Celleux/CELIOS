@@ -40,7 +40,7 @@ struct ScanHistoryView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 24) {
+            LazyVStack(spacing: 24) {
                 timeRangeSelector
                 progressChart
                 scanTimeline

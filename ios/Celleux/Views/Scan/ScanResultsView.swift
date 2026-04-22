@@ -965,7 +965,7 @@ struct ScanComparisonSheet: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 24) {
+            LazyVStack(spacing: 24) {
                 VStack(spacing: 4) {
                     Text("SCAN COMPARISON")
                         .font(.system(size: 10, weight: .bold))
@@ -1183,7 +1183,7 @@ struct RegionDetailSheet: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            LazyVStack(spacing: 20) {
                 regionHeader
                 PremiumDivider()
                 metricsList

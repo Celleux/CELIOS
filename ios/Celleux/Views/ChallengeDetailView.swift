@@ -17,7 +17,7 @@ struct ChallengeDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 28) {
+            LazyVStack(spacing: 28) {
                 if let challenge, (challenge.isActive || challenge.isCompleted) {
                     heroProgressRing(challenge)
                     milestoneTimeline(challenge)

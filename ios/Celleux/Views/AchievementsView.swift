@@ -28,7 +28,7 @@ struct AchievementsView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 28) {
+            LazyVStack(spacing: 28) {
                 pointsHeader
                 
                 ForEach(AchievementCategory.allCases, id: \.rawValue) { category in

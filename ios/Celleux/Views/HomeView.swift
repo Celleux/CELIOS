@@ -30,7 +30,7 @@ struct HomeView: View {
                     .opacity(0.6)
 
                 ScrollView {
-                    VStack(spacing: 32) {
+                    LazyVStack(spacing: 32) {
                         if viewModel.isRefreshing {
                             GoldRefreshSpinner()
                                 .frame(maxWidth: .infinity)
@@ -1430,7 +1430,7 @@ struct LongevityFactorDetailSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 24) {
+                LazyVStack(spacing: 24) {
                     heroSection
                     if !history.isEmpty {
                         trendSection
@@ -1593,7 +1593,7 @@ struct MoodCheckInSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 28) {
+                LazyVStack(spacing: 28) {
                     valenceSection
                     labelsSection
                     associationsSection
