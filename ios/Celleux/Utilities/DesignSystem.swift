@@ -339,43 +339,52 @@ extension Color {
 }
 
 struct CelleuxMeshBackground: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
-        ZStack {
-            Color(.displayP3, red: 0.97, green: 0.96, blue: 0.94)
-                .ignoresSafeArea()
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { context in
+            let t = context.date.timeIntervalSinceReferenceDate
+            let drift = reduceMotion ? 0 : sin(t * 0.12) * 0.035
+            let drift2 = reduceMotion ? 0 : cos(t * 0.09) * 0.03
 
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [
-                            Color(.displayP3, red: 0.92, green: 0.88, blue: 0.80).opacity(0.3),
-                            Color.clear
-                        ],
-                        center: .topLeading,
-                        startRadius: 50,
-                        endRadius: 300
-                    )
-                )
-                .frame(width: 400, height: 400)
-                .offset(x: -100, y: -50)
-                .allowsHitTesting(false)
-
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [
-                            Color(.displayP3, red: 0.85, green: 0.86, blue: 0.90).opacity(0.2),
-                            Color.clear
-                        ],
-                        center: .bottomTrailing,
-                        startRadius: 50,
-                        endRadius: 300
-                    )
-                )
-                .frame(width: 350, height: 350)
-                .offset(x: 100, y: 200)
-                .allowsHitTesting(false)
+            MeshGradient(
+                width: 3,
+                height: 3,
+                points: [
+                    [0.0, 0.0], [0.5 + Float(drift), 0.0], [1.0, 0.0],
+                    [0.0, 0.5 + Float(drift2)], [0.5, 0.5], [1.0, 0.5 - Float(drift2)],
+                    [0.0, 1.0], [0.5 - Float(drift), 1.0], [1.0, 1.0]
+                ],
+                colors: [
+                    Color(.displayP3, red: 0.985, green: 0.975, blue: 0.955),
+                    Color(.displayP3, red: 0.965, green: 0.945, blue: 0.905),
+                    Color(.displayP3, red: 0.955, green: 0.955, blue: 0.965),
+                    Color(.displayP3, red: 0.975, green: 0.965, blue: 0.940),
+                    Color(.displayP3, red: 0.99, green: 0.98, blue: 0.96),
+                    Color(.displayP3, red: 0.94, green: 0.94, blue: 0.96),
+                    Color(.displayP3, red: 0.97, green: 0.955, blue: 0.925),
+                    Color(.displayP3, red: 0.96, green: 0.95, blue: 0.94),
+                    Color(.displayP3, red: 0.935, green: 0.935, blue: 0.955)
+                ]
+            )
+            .ignoresSafeArea()
         }
+        .overlay(
+            RadialGradient(
+                colors: [Color(.displayP3, red: 0.92, green: 0.84, blue: 0.66).opacity(0.12), .clear],
+                center: .topLeading, startRadius: 40, endRadius: 360
+            )
+            .allowsHitTesting(false)
+            .ignoresSafeArea()
+        )
+        .overlay(
+            RadialGradient(
+                colors: [Color(.displayP3, red: 0.80, green: 0.82, blue: 0.88).opacity(0.10), .clear],
+                center: .bottomTrailing, startRadius: 40, endRadius: 360
+            )
+            .allowsHitTesting(false)
+            .ignoresSafeArea()
+        )
     }
 }
 
@@ -776,29 +785,82 @@ struct LuxuryBezelRing: View {
     var body: some View {
         ZStack {
             Circle()
-                .stroke(CelleuxColors.bezelOuterGradient, lineWidth: 3)
-                .frame(width: size + lineWidth + 8, height: size + lineWidth + 8)
+                .stroke(
+                    AngularGradient(
+                        colors: [
+                            Color.white.opacity(0.95),
+                            Color(.displayP3, red: 0.70, green: 0.72, blue: 0.76).opacity(0.55),
+                            Color.white.opacity(0.85),
+                            Color(.displayP3, red: 0.85, green: 0.80, blue: 0.68).opacity(0.60),
+                            Color.white.opacity(0.95)
+                        ],
+                        center: .center
+                    ),
+                    lineWidth: 3
+                )
+                .frame(width: size + lineWidth + 10, height: size + lineWidth + 10)
+                .shadow(color: .white.opacity(0.9), radius: 1, x: 0, y: -1)
+                .shadow(color: .black.opacity(0.08), radius: 2, x: 0, y: 1)
 
             Circle()
-                .stroke(Color(.displayP3, red: 0.93, green: 0.91, blue: 0.89), lineWidth: lineWidth)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color(.displayP3, red: 0.88, green: 0.86, blue: 0.83),
+                            Color(.displayP3, red: 0.94, green: 0.92, blue: 0.89)
+                        ],
+                        startPoint: .topLeading, endPoint: .bottomTrailing
+                    ),
+                    lineWidth: lineWidth
+                )
                 .frame(width: size, height: size)
+                .overlay(
+                    Circle()
+                        .stroke(Color.black.opacity(0.06), lineWidth: 1)
+                        .frame(width: size - lineWidth * 0.5, height: size - lineWidth * 0.5)
+                        .blur(radius: 1)
+                        .mask(
+                            Circle()
+                                .stroke(lineWidth: lineWidth)
+                                .frame(width: size, height: size)
+                        )
+                )
 
             Circle()
                 .trim(from: 0, to: progress)
                 .stroke(
-                    CelleuxColors.bezelProgressGradient,
+                    AngularGradient(
+                        colors: [
+                            Color(.displayP3, red: 0.88, green: 0.78, blue: 0.55),
+                            Color(.displayP3, red: 0.78, green: 0.66, blue: 0.43),
+                            Color(.displayP3, red: 0.95, green: 0.88, blue: 0.68),
+                            Color(.displayP3, red: 0.78, green: 0.66, blue: 0.43),
+                            Color(.displayP3, red: 0.88, green: 0.78, blue: 0.55)
+                        ],
+                        center: .center,
+                        startAngle: .degrees(-90),
+                        endAngle: .degrees(270)
+                    ),
                     style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
                 )
                 .frame(width: size, height: size)
                 .rotationEffect(.degrees(-90))
-                .shadow(color: CelleuxColors.goldGlow.opacity(glowing ? 0.6 : 0.2), radius: glowing ? 18 : 8)
+                .shadow(color: CelleuxColors.goldGlow.opacity(glowing ? 0.7 : 0.25), radius: glowing ? 22 : 10)
+                .shadow(color: Color(.displayP3, red: 0.78, green: 0.55, blue: 0.25).opacity(0.25), radius: 2, x: 0, y: 1)
 
             Circle()
-                .trim(from: 0.05, to: 0.25)
-                .stroke(Color.white.opacity(0.6), lineWidth: 1.5)
-                .frame(width: size + 4, height: size + 4)
-                .blur(radius: 0.5)
-                .rotationEffect(.degrees(-80))
+                .trim(from: 0.04, to: 0.22)
+                .stroke(Color.white.opacity(0.75), lineWidth: 1.8)
+                .frame(width: size + 5, height: size + 5)
+                .blur(radius: 0.6)
+                .rotationEffect(.degrees(-82))
+
+            Circle()
+                .trim(from: 0.52, to: 0.62)
+                .stroke(Color.white.opacity(0.35), lineWidth: 1.2)
+                .frame(width: size + 5, height: size + 5)
+                .blur(radius: 0.8)
+                .rotationEffect(.degrees(-90))
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Score ring")
@@ -996,6 +1058,118 @@ extension View {
     func breathingShadow(color: Color = CelleuxColors.goldGlow, isActive: Bool) -> some View {
         self
             .shadow(color: color.opacity(isActive ? 0.12 : 0.06), radius: isActive ? 30 : 15, x: 0, y: 10)
+    }
+
+    func parallaxTilt(maxAngle: Double = 8, resetDelay: Double = 0.25) -> some View {
+        modifier(ParallaxTiltModifier(maxAngle: maxAngle, resetDelay: resetDelay))
+    }
+
+    func ambientTilt(amount: Double = 1.4) -> some View {
+        modifier(AmbientTiltModifier(amount: amount))
+    }
+
+    func specularSheen(active: Bool = true) -> some View {
+        overlay {
+            if active {
+                GeometryReader { geo in
+                    TimelineView(.animation) { context in
+                        let t = context.date.timeIntervalSinceReferenceDate
+                        let cycle = (t.truncatingRemainder(dividingBy: 6.0)) / 6.0
+                        let x = (cycle * 1.8 - 0.4) * geo.size.width
+                        LinearGradient(
+                            colors: [
+                                .clear,
+                                Color.white.opacity(0.22),
+                                Color.white.opacity(0.35),
+                                Color.white.opacity(0.22),
+                                .clear
+                            ],
+                            startPoint: .leading, endPoint: .trailing
+                        )
+                        .frame(width: geo.size.width * 0.35)
+                        .offset(x: x)
+                        .rotationEffect(.degrees(18))
+                        .blendMode(.plusLighter)
+                        .allowsHitTesting(false)
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct AmbientTiltModifier: ViewModifier {
+    let amount: Double
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        if reduceMotion {
+            content
+        } else {
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { context in
+                let t = context.date.timeIntervalSinceReferenceDate
+                let rx = sin(t * 0.35) * amount
+                let ry = cos(t * 0.28) * amount
+                content
+                    .rotation3DEffect(.degrees(rx), axis: (x: 1, y: 0, z: 0), perspective: 0.8)
+                    .rotation3DEffect(.degrees(ry), axis: (x: 0, y: 1, z: 0), perspective: 0.8)
+            }
+        }
+    }
+}
+
+struct ParallaxTiltModifier: ViewModifier {
+    let maxAngle: Double
+    let resetDelay: Double
+    @State private var tx: CGFloat = 0
+    @State private var ty: CGFloat = 0
+    @State private var size: CGSize = .zero
+    @State private var isPressed: Bool = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var normX: Double {
+        guard size.width > 1 else { return 0 }
+        return Double(tx / size.width)
+    }
+    private var normY: Double {
+        guard size.height > 1 else { return 0 }
+        return Double(ty / size.height)
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .onGeometryChange(for: CGSize.self, of: { $0.size }) { size = $0 }
+            .rotation3DEffect(
+                .degrees(reduceMotion ? 0 : -normY * maxAngle),
+                axis: (x: 1, y: 0, z: 0),
+                perspective: 0.8
+            )
+            .rotation3DEffect(
+                .degrees(reduceMotion ? 0 : normX * maxAngle),
+                axis: (x: 0, y: 1, z: 0),
+                perspective: 0.8
+            )
+            .scaleEffect(isPressed ? 0.985 : 1.0)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        let cx = size.width / 2
+                        let cy = size.height / 2
+                        withAnimation(.interactiveSpring(response: 0.25, dampingFraction: 0.7)) {
+                            tx = value.location.x - cx
+                            ty = value.location.y - cy
+                            isPressed = true
+                        }
+                    }
+                    .onEnded { _ in
+                        withAnimation(.spring(response: 0.55, dampingFraction: 0.6)) {
+                            tx = 0
+                            ty = 0
+                            isPressed = false
+                        }
+                    }
+            )
     }
 }
 

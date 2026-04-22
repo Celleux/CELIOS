@@ -356,7 +356,9 @@ struct HomeView: View {
                 .padding(24)
                 .background(heroCardBackground)
             }
-            .shimmer()
+            .specularSheen()
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .ambientTilt(amount: 1.2)
         }
         .matchedTransitionSource(id: "scoreHero", in: heroAnimation)
         .buttonStyle(PressableButtonStyle())
@@ -381,12 +383,46 @@ struct HomeView: View {
     private var heroCardBackground: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(Color.white.opacity(0.92))
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(.displayP3, red: 1.0, green: 0.995, blue: 0.985),
+                            Color(.displayP3, red: 0.975, green: 0.965, blue: 0.945)
+                        ],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                )
             RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .stroke(CelleuxColors.glassEdgeHighlight, lineWidth: 1)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.55), .clear],
+                        startPoint: .top, endPoint: .center
+                    )
+                )
+                .blendMode(.plusLighter)
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .stroke(
+                    AngularGradient(
+                        colors: [
+                            Color.white.opacity(0.95),
+                            CelleuxColors.warmGold.opacity(0.45),
+                            Color.white.opacity(0.7),
+                            CelleuxP3.coolSilver.opacity(0.5),
+                            CelleuxColors.warmGold.opacity(0.35),
+                            Color.white.opacity(0.9)
+                        ],
+                        center: .center
+                    ),
+                    lineWidth: 1
+                )
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .inset(by: 0.5)
+                .stroke(Color.white.opacity(0.6), lineWidth: 0.5)
+                .blur(radius: 0.5)
         }
-        .shadow(color: .black.opacity(0.06), radius: 12, x: 0, y: 6)
-        .shadow(color: .black.opacity(0.03), radius: 30, x: 0, y: 15)
+        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+        .shadow(color: .black.opacity(0.06), radius: 14, x: 0, y: 8)
+        .shadow(color: .black.opacity(0.04), radius: 36, x: 0, y: 20)
     }
 
     // MARK: - 3. Longevity Composite Card
